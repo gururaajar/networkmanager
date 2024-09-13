@@ -473,14 +473,14 @@ const string CIDR_PREFIXES[CIDR_NETMASK_IP_LEN] = {
                 response["ipaddr"]       = tmpResponse["ipaddress"];
                 if(tmpResponse["ipaddress"].String().empty())
                     response["netmask"]  = "";
-                else if (strcasecmp (result.m_ipAddrType, "IPv4") == 0)
+                else if (strcasecmp (tmpResponse["ipaddress"].String().c_str(), "IPv4") == 0)
                 {
                     index = tmpResponse["prefix"].Number();
                     if(CIDR_NETMASK_IP_LEN <= index)
                         return Core::ERROR_GENERAL;
                     response["netmask"]  = CIDR_PREFIXES[index];
                 }
-                else if (strcasecmp (result.m_ipAddrType, "IPv6") == 0)
+                else if (strcasecmp (tmpResponse["ipaddress"].String().c_str(), "IPv6") == 0)
                 {
                     response["netmask"]  = tmpResponse["prefix"];
                 }

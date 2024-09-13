@@ -328,7 +328,7 @@ namespace WPEFramework
             else
                 rc = Core::ERROR_UNAVAILABLE;
 
-            JsonArray array = response["ssids"].Array();
+            JsonArray array = tmpResponse["ssids"].Array();
             if (0 == array.Length())
             {
                 response["ssid"] = NULL;
