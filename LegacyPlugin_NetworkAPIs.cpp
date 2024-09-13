@@ -455,7 +455,6 @@ const string CIDR_PREFIXES[CIDR_NETMASK_IP_LEN] = {
             if (Core::ERROR_NONE == rc)
             {
                 string ipversion = tmpResponse["ipversion"].String();
-                std::transform(ipversion.begin(), ipversion.end(), ipversion.begin(), ::toupper);
 
                 if (parameters.HasLabel("interface"))
                 {
@@ -474,14 +473,14 @@ const string CIDR_PREFIXES[CIDR_NETMASK_IP_LEN] = {
                 response["ipaddr"]       = tmpResponse["ipaddress"];
                 if(tmpResponse["ipaddress"].String().empty())
                     response["netmask"]  = "";
-                else if ("IPV4" == ipversion)
+                else if (strcasecmp (result.m_ipAddrType, "IPv4") == 0)
                 {
                     index = tmpResponse["prefix"].Number();
                     if(CIDR_NETMASK_IP_LEN <= index)
                         return Core::ERROR_GENERAL;
                     response["netmask"]  = CIDR_PREFIXES[index];
                 }
-                else if ("IPV6" == ipversion)
+                else if (strcasecmp (result.m_ipAddrType, "IPv6") == 0)
                 {
                     response["netmask"]  = tmpResponse["prefix"];
                 }
@@ -622,23 +621,17 @@ const string CIDR_PREFIXES[CIDR_NETMASK_IP_LEN] = {
         uint32_t Network::getPublicIP(const JsonObject& parameters, JsonObject& response)
         {
             uint32_t rc = Core::ERROR_GENERAL;
-            string interface;
             string ipversion{"IPv4"};
             JsonObject tmpParameters;
             JsonObject tmpResponse;
 
             LOGINFOMETHOD();
-            if("WIFI" == parameters["iface"].String())
-                interface = "wlan0";
-            else if("ETHERNET" == parameters["iface"].String())
-                interface = "eth0";
 
-             if(parameters["ipv6"].Boolean())
+            if(parameters["ipv6"].Boolean())
                 ipversion = "IPv6";
             else
                 ipversion = "IPv4";
 
-            tmpParameters["interface"] = interface;
             tmpParameters["ipversion"] = ipversion;
 
             if (m_networkmanager)
