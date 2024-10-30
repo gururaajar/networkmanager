@@ -686,12 +686,47 @@ namespace WPEFramework
         uint32_t NetworkManagerImplementation::StartWPS(const WiFiWPS& method /* @in */, const string& wps_pin /* @in */)
         {
             uint32_t rc = Core::ERROR_RPC_CALL_FAILED;
+            if (method == WIFI_WPS_PBC)
+            {
+                std::string startCmd = "wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant.conf";
+                FILE* fd = popen(startCmd.c_str(), "r");
+                if (!fd)
+                {
+                    NMLOG_ERROR("StartWPS popen failed to start wpa_supplicant");
+                    return rc;
+                }
+                pclose(fd);
+
+                std::string wpsCmd = "wpa_cli -i wlan0 wps_pbc";
+                fd = popen(wpsCmd.c_str(), "r");
+                if (!fd)
+                {
+                    NMLOG_ERROR("StartWPS popen failed to start wps process");
+                    return rc;
+                }
+                pclose(fd);
+
+                rc = Core::ERROR_NONE;
+            }
+            else
+            {
+                NMLOG_INFO("StartWPS only push button support available");
+            }
             return rc;
         }
 
         uint32_t NetworkManagerImplementation::StopWPS(void)
         {
             uint32_t rc = Core::ERROR_RPC_CALL_FAILED;
+            std::string cmd = "wpa_cli -i wlan0 wps_cancel";
+            FILE* fd = popen(cmd.c_str(), "r");
+            if (!fd) {
+                NMLOG_ERROR("StopWPS popen failed");
+                return rc;
+            }
+            else
+                rc = Core::ERROR_NONE;
+            pclose(fd);
             return rc;
         }
 
