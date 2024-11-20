@@ -55,6 +55,7 @@ namespace WPEFramework
             bool wait(GMainLoop *loop, int timeOutMs = 10000); // default maximium set as 10 sec
             bool initiateWPS();
             bool cancelWPS();
+            void wpsAction();
         private:
             NMDevice *getNmDevice();
 
@@ -77,6 +78,7 @@ namespace WPEFramework
             void operator=(wifiManager const&) = delete;
 
             bool createClientNewConnection();
+            Core::ProxyType<Core::IDispatch> job;
 
         public:
             NMClient *client;
