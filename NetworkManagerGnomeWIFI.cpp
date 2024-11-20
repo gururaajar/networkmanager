@@ -949,7 +949,7 @@ namespace WPEFramework
         {
             if(!createClientNewConnection())
                 return;
-            std::string wpaCliCommand = "wpa_cli -i " + nmUtils::wlanIface() + " wps_pbc";
+            std::string wpaCliCommand = "wpa_cli -i " + std::string(nmUtils::wlanIface()) + " wps_pbc";
             NMLOG_INFO("wpaCliCommand = %s", wpaCliCommand.c_str());
             fp = popen(wpaCliCommand.c_str(), "r");
             if (fp == nullptr) {
