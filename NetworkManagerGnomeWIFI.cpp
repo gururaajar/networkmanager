@@ -171,21 +171,22 @@ namespace WPEFramework
             return wifiDevice;
         }
 
-        bool static getConnectedSSID(NMDeviceWifi *wifiDevice, std::string& ssidin)
+        bool static getConnectedSSID(NMDevice *device, std::string& ssidin)
         {
             GBytes *ssid;
-            NMAccessPoint *activeAP = nm_device_wifi_get_active_access_point(wifiDevice);
-            if(activeAP == NULL) {
-                return false;
+            NMDeviceState device_state = nm_device_get_state(device);
+            if (device_state == NM_DEVICE_STATE_ACTIVATED)
+            {
+                NMAccessPoint *activeAP = nm_device_wifi_get_active_access_point(NM_DEVICE_WIFI(device));
+                ssid = nm_access_point_get_ssid(activeAP);
+                gsize size;
+                const guint8 *ssidData = static_cast<const guint8 *>(g_bytes_get_data(ssid, &size));
+                std::string ssidTmp(reinterpret_cast<const char *>(ssidData), size);
+                ssidin = ssidTmp;
+                NMLOG_INFO("connected ssid: %s", ssidin.c_str());
+                return true;
             }
-
-            ssid = nm_access_point_get_ssid(activeAP);
-            gsize size;
-            const guint8 *ssidData = static_cast<const guint8 *>(g_bytes_get_data(ssid, &size));
-            std::string ssidTmp(reinterpret_cast<const char *>(ssidData), size);
-            ssidin = ssidTmp;
-            NMLOG_INFO("connected ssid: %s", ssidin.c_str());
-            return true;
+            return false;
         }
 
         static void getApInfo(NMAccessPoint *AccessPoint, Exchange::INetworkManager::WiFiSSIDInfo &wifiInfo)
@@ -584,7 +585,7 @@ namespace WPEFramework
                 return false;
 
             std::string activeSSID;
-            if(getConnectedSSID(NM_DEVICE_WIFI(device), activeSSID))
+            if(getConnectedSSID(device, activeSSID))
             {
                 if(ssidInfo.ssid == activeSSID)
                 {
