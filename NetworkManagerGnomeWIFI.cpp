@@ -947,6 +947,7 @@ namespace WPEFramework
 
         void wifiManager::wpsAction()
         {
+            FILE *fp;
             if(!createClientNewConnection())
                 return;
             std::string wpaCliCommand = "wpa_cli -i " + std::string(nmUtils::wlanIface()) + " wps_pbc";
@@ -966,7 +967,6 @@ namespace WPEFramework
             std::string ssid_key = "ssid=";
             std::string psk_key = "psk=";
             std::string key_mgmt_result, ssid_result, psk_result;
-            int security;
             Exchange::INetworkManager::WiFiConnectTo wifiData;
 
             if (!configFile.is_open()) {
