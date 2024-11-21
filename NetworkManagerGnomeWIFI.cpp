@@ -948,26 +948,23 @@ namespace WPEFramework
         void wifiManager::wpsAction()
         {
             FILE *fp;
+            std::ifstream configFile("/opt/secure/wifi/wpa_supplicant.conf");
+            std::string line;
+            std::string securityPattern = "key_mgmt=";
+            std::string ssidPattern = "ssid=";
+            std::string passphrasePattern = "psk=";
+            std::string security, ssid, passphrase;
+            Exchange::INetworkManager::WiFiConnectTo wifiData;
+
             if(!createClientNewConnection())
                 return;
             std::string wpaCliCommand = "wpa_cli -i " + std::string(nmUtils::wlanIface()) + " wps_pbc";
-            NMLOG_INFO("wpaCliCommand = %s", wpaCliCommand.c_str());
             fp = popen(wpaCliCommand.c_str(), "r");
             if (fp == nullptr) {
-                NMLOG_ERROR("popen failed");
+                NMLOG_ERROR("wpa_cli popen failed");
                 return ;
             }
-            else
-                NMLOG_INFO("wpaCliCommand success");
             pclose(fp);
-
-            std::ifstream configFile("/opt/secure/wifi/wpa_supplicant.conf");
-            std::string line;
-            std::string key_mgmt_key = "key_mgmt=";
-            std::string ssid_key = "ssid=";
-            std::string psk_key = "psk=";
-            std::string key_mgmt_result, ssid_result, psk_result;
-            Exchange::INetworkManager::WiFiConnectTo wifiData;
 
             if (!configFile.is_open()) {
                 NMLOG_ERROR("Unable to open wpa_supplicant.conf file");
@@ -977,49 +974,49 @@ namespace WPEFramework
             while (std::getline(configFile, line)) {
                 size_t pos;
 
-                // Fetch key_mgmt value
-                pos = line.find(key_mgmt_key);
+                // Fetch security value
+                pos = line.find(securityPattern);
                 if (pos != std::string::npos) {
-                    pos += key_mgmt_key.length();
+                    pos += securityPattern.length();
                     size_t end = line.find(' ', pos);
                     if (end == std::string::npos) {
                         end = line.length();
                     }
-                    key_mgmt_result = line.substr(pos, end - pos);
+                    security = line.substr(pos, end - pos);
                     continue;
                 }
 
                 // Fetch ssid value
-                pos = line.find(ssid_key);
+                pos = line.find(ssidPattern);
                 if (pos != std::string::npos) {
-                    pos += ssid_key.length();
+                    pos += ssidPattern.length();
                     size_t end = line.find('"', pos + 1);
                     if (end == std::string::npos) {
                         end = line.length();
                     }
-                    ssid_result = line.substr(pos + 1, end - pos - 1);
+                    ssid = line.substr(pos + 1, end - pos - 1);
                     continue;
                 }
 
-                // Fetch psk value
-                pos = line.find(psk_key);
+                // Fetch passphare value
+                pos = line.find(passphrasePattern);
                 if (pos != std::string::npos) {
-                    pos += psk_key.length();
+                    pos += passphrasePattern.length();
                     size_t end = line.find('"', pos + 1);
                     if (end == std::string::npos) {
                         end = line.length();
                     }
-                    psk_result = line.substr(pos + 1, end - pos - 1);
+                    passphrase = line.substr(pos + 1, end - pos - 1);
                     continue;
                 }
             }
 
             configFile.close();
-            wifiData.ssid = ssid_result;
-            wifiData.passphrase = psk_result;
-            if(key_mgmt_result == "WPA-PSK")
+            wifiData.ssid = ssid;
+            wifiData.passphrase = passphrase;
+            if(security == "WPA-PSK")
                 wifiData.security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK_AES; 
-            else if(key_mgmt_result == "WPA2-PSK")
+            else if(security == "WPA2-PSK")
                 wifiData.security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA2_PSK_AES; 
 
             if(wifiConnect(wifiData))
