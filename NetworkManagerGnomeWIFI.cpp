@@ -961,14 +961,17 @@ namespace WPEFramework
             struct timespec startTime = {}, endTime = {};
             long timeDiff = 0;
 
-            if (!g_main_context_acquire(wpsContext))
+            NMLOG_DEBUG("-------------------1-------------------------");
+            if (!wpsContext || !g_main_context_acquire(wpsContext))
             {
                 NMLOG_ERROR("Failed to acquire wpsContext");
                 return;
             }
 
+            NMLOG_DEBUG("-------------------2-------------------------");
             g_main_context_push_thread_default(wpsContext);
 
+            NMLOG_DEBUG("-------------------3-------------------------");
             std::string wpaCliCommand = "wpa_cli -i " + std::string(nmUtils::wlanIface()) + " wps_pbc";
             fp = popen(wpaCliCommand.c_str(), "r");
             if (fp == nullptr)
@@ -981,6 +984,8 @@ namespace WPEFramework
             pclose(fp);
             std::string wpaCliStatus = WPA_CLI_STATUS;
             clock_gettime(CLOCK_MONOTONIC, &startTime);
+            NMLOG_DEBUG("-------------------4-------------------------");
+            NMLOG_INFO("outside wpsConnect is %d", wpsConnect);
             while(!wpsStop.load())
             {
                 fp = popen(wpaCliStatus.c_str(), "r");
@@ -993,18 +998,22 @@ namespace WPEFramework
                 {
                     wpaCliResult += buffer.data();
                 }
+                pclose(fp);
                 wpsConnect = (wpaCliResult.find("wpa_state=COMPLETED") != std::string::npos);
                 clock_gettime(CLOCK_MONOTONIC, &endTime);
                 timeDiff = (endTime.tv_sec - startTime.tv_sec);
                 NMLOG_DEBUG("Time elapsed before getting wifi connected = %ld", timeDiff);
                 if(wpsConnect || timeDiff > 120)
+                {
+                    NMLOG_INFO("wpsConnect is %d", wpsConnect);
                     break;
-                pclose(fp);
+                }
                 sleep(5);
             }
 
             if(!wpsConnect)
             {
+                NMLOG_INFO("Inside !wpsConnect is %d", wpsConnect);
                 g_main_context_pop_thread_default(wpsContext);
                 g_main_context_release(wpsContext);/* TODO: Need to disconnect the wpa_cli connection, as the libnm is not aware of the connection created by wpa_cli */
                 return;
@@ -1021,6 +1030,7 @@ namespace WPEFramework
 
                 while (std::getline(configFile, line))
                 {
+                    NMLOG_INFO("Inside getline while");
                     size_t pos;
 
                     // Fetch security value
@@ -1065,8 +1075,10 @@ namespace WPEFramework
                         continue;
                     }
                 }
+                NMLOG_INFO("Completed getline while");
 
                 configFile.close();
+                NMLOG_INFO("ssid value = %s", ssid.c_str());
                 wifiData.ssid = ssid;
                 wifiData.passphrase = passphrase;
                 if(security == "WPA-PSK")
@@ -1079,12 +1091,14 @@ namespace WPEFramework
             else
                 NMLOG_ERROR("WPS connect failed");/* TODO: Need to disconnect the wpa_cli connection, as the libnm is not aware of the connection created by wpa_cli */
 
+            NMLOG_INFO("wpsAction cleanup start");
             g_main_context_pop_thread_default(wpsContext);
             g_main_context_release(wpsContext);
             if (wpsContext) {
                     g_main_context_unref(wpsContext);
                     wpsContext = nullptr;
             }
+            NMLOG_INFO("wpsAction cleanup end");
             return;
         }
 
@@ -1098,6 +1112,10 @@ namespace WPEFramework
                     wpsThread.join();
                 }
                 wpsContext = g_main_context_new();
+                if (!wpsContext) {
+                    NMLOG_ERROR("Failed to create new main context for WPS");
+                    return false;
+                }
                 wpsThread = std::thread(&wifiManager::wpsAction, this);
             }
             else
