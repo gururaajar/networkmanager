@@ -1036,7 +1036,7 @@ namespace WPEFramework
                     NMLOG_ERROR("cat command popen failed");
                     return;
                 }
-                while (fgets(buffer2.data(), buffer2.size(), pipe) != nullptr) {
+                while (fgets(buffer2.data(), buffer2.size(), fp) != nullptr) {
                     std::cout << buffer2.data();
                     NMLOG_INFO("buffer2.data() = %s", buffer2.data());
                 }
