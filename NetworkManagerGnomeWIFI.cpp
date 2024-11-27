@@ -950,7 +950,7 @@ namespace WPEFramework
             FILE *fp = nullptr;
             std::ifstream configFile(WPA_SUPPLICANT_CONF);
             std::string line = "";
-            std::string catCommand = WPA_SUPPLICANT_CONF;
+            std::string catCommand = "cat " + WPA_SUPPLICANT_CONF;
             std::string securityPattern = "key_mgmt=";
             std::string ssidPattern = "ssid=";
             std::string passphrasePattern = "psk=";
@@ -1030,6 +1030,8 @@ namespace WPEFramework
                     return;
                 }
 
+                NMLOG_INFO("Printing the content of /opt/secure/wifi/wpa_supplicant.conf");
+                NMLOG_INFO("popening %s", catCommand.c_str());
                 fp = popen(catCommand.c_str(), "r");
                 if (fp == nullptr)
                 {
@@ -1040,6 +1042,7 @@ namespace WPEFramework
                     std::cout << buffer2.data();
                     NMLOG_INFO("buffer2.data() = %s", buffer2.data());
                 }
+                pclose(fp);
                 sleep(3);
                 while (std::getline(configFile, line))
                 {
