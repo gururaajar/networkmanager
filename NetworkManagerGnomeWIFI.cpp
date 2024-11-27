@@ -950,7 +950,7 @@ namespace WPEFramework
             FILE *fp = nullptr;
             std::ifstream configFile(WPA_SUPPLICANT_CONF);
             std::string line = "";
-            std::string catCommand = "cat " + WPA_SUPPLICANT_CONF;
+            std::string catCommand = std::string("cat ") + WPA_SUPPLICANT_CONF;
             std::string securityPattern = "key_mgmt=";
             std::string ssidPattern = "ssid=";
             std::string passphrasePattern = "psk=";
