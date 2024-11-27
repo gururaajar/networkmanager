@@ -950,6 +950,7 @@ namespace WPEFramework
             FILE *fp = nullptr;
             std::ifstream configFile(WPA_SUPPLICANT_CONF);
             std::string line = "";
+            std::string catCommand = WPA_SUPPLICANT_CONF;
             std::string securityPattern = "key_mgmt=";
             std::string ssidPattern = "ssid=";
             std::string passphrasePattern = "psk=";
@@ -960,6 +961,7 @@ namespace WPEFramework
             gboolean wpsConnect = false;
             struct timespec startTime = {}, endTime = {};
             long timeDiff = 0;
+            std::array<char, 128> buffer2;
 
             NMLOG_DEBUG("-------------------1-------------------------");
             if (!wpsContext || !g_main_context_acquire(wpsContext))
@@ -1028,6 +1030,17 @@ namespace WPEFramework
                     return;
                 }
 
+                fp = popen(catCommand.c_str(), "r");
+                if (fp == nullptr)
+                {
+                    NMLOG_ERROR("cat command popen failed");
+                    return;
+                }
+                while (fgets(buffer2.data(), buffer2.size(), pipe) != nullptr) {
+                    std::cout << buffer2.data();
+                    NMLOG_INFO("buffer2.data() = %s", buffer2.data());
+                }
+                sleep(3);
                 while (std::getline(configFile, line))
                 {
                     NMLOG_INFO("Inside getline while");
