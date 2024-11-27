@@ -948,7 +948,6 @@ namespace WPEFramework
         void wifiManager::wpsAction()
         {
             FILE *fp = nullptr;
-            std::ifstream configFile(WPA_SUPPLICANT_CONF);
             std::string line = "";
             std::string catCommand = std::string("cat ") + WPA_SUPPLICANT_CONF;
             std::string securityPattern = "key_mgmt=";
@@ -1022,6 +1021,8 @@ namespace WPEFramework
             }
 
             {
+                sleep(5);
+                std::ifstream configFile(WPA_SUPPLICANT_CONF);
                 if (!configFile.is_open())
                 {
                     NMLOG_ERROR("WPS connected with an SSID but not able to fetch IP address");
@@ -1043,7 +1044,6 @@ namespace WPEFramework
                     NMLOG_INFO("buffer2.data() = %s", buffer2.data());
                 }
                 pclose(fp);
-                sleep(3);
                 while (std::getline(configFile, line))
                 {
                     NMLOG_INFO("Inside getline while");
