@@ -961,6 +961,8 @@ namespace WPEFramework
             struct timespec startTime = {}, endTime = {};
             long timeDiff = 0;
             std::array<char, 128> buffer2;
+            int count = 0;
+            bool ssidFound = false;
 
             NMLOG_DEBUG("-------------------1-------------------------");
             if (!wpsContext || !g_main_context_acquire(wpsContext))
@@ -1020,8 +1022,8 @@ namespace WPEFramework
                 return;
             }
 
+            while(count < 2 && !ssidFound)
             {
-                sleep(5);
                 std::ifstream configFile(WPA_SUPPLICANT_CONF);
                 if (!configFile.is_open())
                 {
@@ -1049,20 +1051,6 @@ namespace WPEFramework
                     NMLOG_INFO("Inside getline while");
                     size_t pos;
 
-                    // Fetch security value
-                    pos = line.find(securityPattern);
-                    if (pos != std::string::npos)
-                    {
-                        pos += securityPattern.length();
-                        size_t end = line.find(' ', pos);
-                        if (end == std::string::npos)
-                        {
-                            end = line.length();
-                        }
-                        security = line.substr(pos, end - pos);
-                        continue;
-                    }
-
                     // Fetch ssid value
                     pos = line.find(ssidPattern);
                     if (pos != std::string::npos)
@@ -1074,39 +1062,62 @@ namespace WPEFramework
                             end = line.length();
                         }
                         ssid = line.substr(pos + 1, end - pos - 1);
-                        continue;
+                        ssidFound = true;
+                        NMLOG_INFO("SSID found");
                     }
 
-                    // Fetch passphare value
-                    pos = line.find(passphrasePattern);
-                    if (pos != std::string::npos)
-                    {
-                        pos += passphrasePattern.length();
-                        size_t end = line.find('"', pos + 1);
-                        if (end == std::string::npos)
+                    if (ssidFound) {
+                        // Fetch security value
+                        pos = line.find(securityPattern);
+                        if (pos != std::string::npos)
                         {
-                            end = line.length();
+                            pos += securityPattern.length();
+                            size_t end = line.find(' ', pos);
+                            if (end == std::string::npos)
+                            {
+                                end = line.length();
+                            }
+                            security = line.substr(pos, end - pos);
                         }
-                        passphrase = line.substr(pos + 1, end - pos - 1);
-                        continue;
+
+                        // Fetch passphare value
+                        pos = line.find(passphrasePattern);
+                        if (pos != std::string::npos)
+                        {
+                            pos += passphrasePattern.length();
+                            size_t end = line.find('"', pos + 1);
+                            if (end == std::string::npos)
+                            {
+                                end = line.length();
+                            }
+                            passphrase = line.substr(pos + 1, end - pos - 1);
+                        }
+                        NMLOG_INFO("Completed getline while");
+
+                        configFile.close();
+                        NMLOG_INFO("ssid value = %s", ssid.c_str());
+                        wifiData.ssid = ssid;
+                        wifiData.passphrase = passphrase;
+                        if(security == "WPA-PSK")
+                            wifiData.security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK_AES;
+                        else if(security == "WPA2-PSK")
+                            wifiData.security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA2_PSK_AES;
+                        if(this->wifiConnect(wifiData))
+                            NMLOG_INFO("WPS connected successfully");
+                        else
+                            NMLOG_ERROR("WPS connect failed");/* TODO: Need to disconnect the wpa_cli connection, as the libnm is not aware of the connection created by wpa_cli */
                     }
+                    else
+                    {
+                        NMLOG_INFO("Sleeping for 5 sec and retrying for conf file update");
+                        sleep(5);
+                        count++;
+                        break;
+                    }
+
                 }
-                NMLOG_INFO("Completed getline while");
-
                 configFile.close();
-                NMLOG_INFO("ssid value = %s", ssid.c_str());
-                wifiData.ssid = ssid;
-                wifiData.passphrase = passphrase;
-                if(security == "WPA-PSK")
-                    wifiData.security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK_AES;
-                else if(security == "WPA2-PSK")
-                    wifiData.security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA2_PSK_AES;
             }
-            if(this->wifiConnect(wifiData))
-                NMLOG_INFO("WPS connected successfully");
-            else
-                NMLOG_ERROR("WPS connect failed");/* TODO: Need to disconnect the wpa_cli connection, as the libnm is not aware of the connection created by wpa_cli */
-
             NMLOG_INFO("wpsAction cleanup start");
             g_main_context_pop_thread_default(wpsContext);
             g_main_context_release(wpsContext);
