@@ -949,6 +949,7 @@ namespace WPEFramework
         {
             FILE *fp = nullptr;
             std::string line = "";
+            std::string catCommand = std::string("cat ") + WPA_SUPPLICANT_CONF;
             std::string securityPattern = "key_mgmt=";
             std::string ssidPattern = "ssid=";
             std::string passphrasePattern = "psk=";
@@ -959,17 +960,12 @@ namespace WPEFramework
             gboolean wpsConnect = false;
             struct timespec startTime = {}, endTime = {};
             long timeDiff = 0;
+            std::array<char, 128> buffer2;
             int count = 0;
             bool ssidFound = false;
 
-            if (!wpsContext || !g_main_context_acquire(wpsContext))
-            {
-                NMLOG_ERROR("Failed to acquire wpsContext");
-                return;
-            }
-
-            g_main_context_push_thread_default(wpsContext);
-
+            
+            NMLOG_DEBUG("-------------------3-------------------------");
             std::string wpaCliCommand = "wpa_cli -i " + std::string(nmUtils::wlanIface()) + " wps_pbc";
             fp = popen(wpaCliCommand.c_str(), "r");
             if (fp == nullptr)
@@ -982,6 +978,8 @@ namespace WPEFramework
             pclose(fp);
             std::string wpaCliStatus = WPA_CLI_STATUS;
             clock_gettime(CLOCK_MONOTONIC, &startTime);
+            NMLOG_DEBUG("-------------------4-------------------------");
+            NMLOG_INFO("outside wpsConnect is %d", wpsConnect);
             while(!wpsStop.load())
             {
                 fp = popen(wpaCliStatus.c_str(), "r");
@@ -1009,10 +1007,21 @@ namespace WPEFramework
 
             if(!wpsConnect)
             {
+                NMLOG_INFO("Inside !wpsConnect is %d", wpsConnect);
                 g_main_context_pop_thread_default(wpsContext);
                 g_main_context_release(wpsContext);/* TODO: Need to disconnect the wpa_cli connection, as the libnm is not aware of the connection created by wpa_cli */
                 return;
             }
+
+            NMLOG_DEBUG("-------------------1-------------------------");
+            if (!wpsContext || !g_main_context_acquire(wpsContext))
+            {
+                NMLOG_ERROR("Failed to acquire wpsContext");
+                return;
+            }
+
+            NMLOG_DEBUG("-------------------2-------------------------");
+            g_main_context_push_thread_default(wpsContext);
 
             while(count < 2 && !ssidFound)
             {
@@ -1025,8 +1034,22 @@ namespace WPEFramework
                     return;
                 }
 
+                NMLOG_INFO("Printing the content of /opt/secure/wifi/wpa_supplicant.conf");
+                NMLOG_INFO("popening %s", catCommand.c_str());
+                fp = popen(catCommand.c_str(), "r");
+                if (fp == nullptr)
+                {
+                    NMLOG_ERROR("cat command popen failed");
+                    return;
+                }
+                while (fgets(buffer2.data(), buffer2.size(), fp) != nullptr) {
+                    std::cout << buffer2.data();
+                    NMLOG_INFO("buffer2.data() = %s", buffer2.data());
+                }
+                pclose(fp);
                 while (std::getline(configFile, line))
                 {
+                    NMLOG_INFO("Inside getline while");
                     size_t pos;
 
                     // Fetch ssid value
@@ -1072,6 +1095,7 @@ namespace WPEFramework
                             }
                             passphrase = line.substr(pos + 1, end - pos - 1);
                         }
+                        NMLOG_INFO("Completed getline while");
                     }
                 }
                 if(ssid.empty())
@@ -1082,6 +1106,7 @@ namespace WPEFramework
                 }
                 else
                 {
+                    NMLOG_INFO("ssid value = %s", ssid.c_str());
                     wifiData.ssid = ssid;
                     wifiData.passphrase = passphrase;
                     if(security == "WPA-PSK")
@@ -1095,12 +1120,14 @@ namespace WPEFramework
                 }
                 configFile.close();
             }
+            NMLOG_INFO("wpsAction cleanup start");
             g_main_context_pop_thread_default(wpsContext);
             g_main_context_release(wpsContext);
             if (wpsContext) {
                     g_main_context_unref(wpsContext);
                     wpsContext = nullptr;
             }
+            NMLOG_INFO("wpsAction cleanup end");
             return;
         }
 
