@@ -1133,9 +1133,6 @@ namespace WPEFramework
 
         bool wifiManager::initiateWPS()
         {
-            if (!createClientNewConnection())
-                return false;
-
             if(!wpsContext){
                 if (wpsThread.joinable()) {
                     wpsThread.join();
