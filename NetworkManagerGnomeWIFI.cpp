@@ -964,9 +964,19 @@ namespace WPEFramework
             int count = 0;
             bool ssidFound = false;
 
-            
+            NMLOG_DEBUG("-------------------1-------------------------");
+            if (!wpsContext || !g_main_context_acquire(wpsContext))
+            {
+                NMLOG_ERROR("Failed to acquire wpsContext");
+                return;
+            }
+
+            NMLOG_DEBUG("-------------------2-------------------------");
+            g_main_context_push_thread_default(wpsContext);
+
+           
             NMLOG_DEBUG("-------------------3-------------------------");
-            std::string wpaCliCommand = "wpa_cli -i " + std::string(nmUtils::wlanIface()) + " wps_pbc";
+            std::string wpaCliCommand = "wpa_cli disconnect && sleep 3 && wpa_cli -i " + std::string(nmUtils::wlanIface()) + " abort_scan && wpa_cli -i " + std::string(nmUtils::wlanIface()) + " bss_flush 0 && wpa_cli -i " + std::string(nmUtils::wlanIface()) + " wps_pbc";
             fp = popen(wpaCliCommand.c_str(), "r");
             if (fp == nullptr)
             {
@@ -1012,16 +1022,6 @@ namespace WPEFramework
                 g_main_context_release(wpsContext);/* TODO: Need to disconnect the wpa_cli connection, as the libnm is not aware of the connection created by wpa_cli */
                 return;
             }
-
-            NMLOG_DEBUG("-------------------1-------------------------");
-            if (!wpsContext || !g_main_context_acquire(wpsContext))
-            {
-                NMLOG_ERROR("Failed to acquire wpsContext");
-                return;
-            }
-
-            NMLOG_DEBUG("-------------------2-------------------------");
-            g_main_context_push_thread_default(wpsContext);
 
             while(count < 2 && !ssidFound)
             {
@@ -1113,10 +1113,13 @@ namespace WPEFramework
                         wifiData.security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK_AES;
                     else if(security == "WPA2-PSK")
                         wifiData.security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA2_PSK_AES;
+                    loop = g_main_loop_new(wpsContext, FALSE);
                     if(this->wifiConnect(wifiData))
                         NMLOG_INFO("WPS connected successfully");
                     else
                         NMLOG_ERROR("WPS connect failed");/* TODO: Need to disconnect the wpa_cli connection, as the libnm is not aware of the connection created by wpa_cli */
+                    loop = g_main_loop_new(nmContext, FALSE);
+                    break;
                 }
                 configFile.close();
             }
