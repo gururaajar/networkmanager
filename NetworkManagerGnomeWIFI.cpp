@@ -949,7 +949,6 @@ namespace WPEFramework
         {
             FILE *fp = nullptr;
             std::string line = "";
-            std::string catCommand = std::string("cat ") + WPA_SUPPLICANT_CONF;
             std::string securityPattern = "key_mgmt=";
             std::string ssidPattern = "ssid=";
             std::string passphrasePattern = "psk=";
@@ -960,177 +959,138 @@ namespace WPEFramework
             gboolean wpsConnect = false;
             struct timespec startTime = {}, endTime = {};
             long timeDiff = 0;
-            std::array<char, 128> buffer2;
+            std::string catCommand = std::string("cat ") + WPA_SUPPLICANT_CONF;
             int count = 0;
+            bool scanResult = false;
+            const char* bssid = nullptr;
+            const GPtrArray *aps;
             bool ssidFound = false;
+            const GPtrArray  *availableConnections;
+            NMDevice *device = NULL;
+            NMConnection *connection = NULL;
+            std::string ssid_in;
+            NMAccessPoint *ap;
+            int wpsConnected = 0;
+            std::string ssidTmp;
 
-            NMLOG_DEBUG("-------------------1-------------------------");
-            if (!wpsContext || !g_main_context_acquire(wpsContext))
-            {
-                NMLOG_ERROR("Failed to acquire wpsContext");
+            if (!g_main_context_acquire(wpsContext)) {
+                std::cerr << "Failed to acquire main context" << std::endl;
                 return;
             }
 
-            NMLOG_DEBUG("-------------------2-------------------------");
             g_main_context_push_thread_default(wpsContext);
 
-           
-            NMLOG_DEBUG("-------------------3-------------------------");
-            std::string wpaCliCommand = "wpa_cli disconnect && sleep 3 && wpa_cli -i " + std::string(nmUtils::wlanIface()) + " abort_scan && wpa_cli -i " + std::string(nmUtils::wlanIface()) + " bss_flush 0 && wpa_cli -i " + std::string(nmUtils::wlanIface()) + " wps_pbc";
-            fp = popen(wpaCliCommand.c_str(), "r");
-            if (fp == nullptr)
+            loop = g_main_loop_new(wpsContext, FALSE);
+            do{
+                sleep(10);
+                scanResult = wifiScanRequest("");
+                printf("scanResult = %d\n", scanResult);
+                if(scanResult)
+                {
+                    aps = nm_device_wifi_get_access_points(NM_DEVICE_WIFI(getNmDevice()));
+                    NMLOG_INFO("aps->len = %d", aps->len);
+                    for (guint i = 0; i < aps->len; i++) {
+                        ap = static_cast<NMAccessPoint *>(g_ptr_array_index(aps, i));
+                        guint32 flags = nm_access_point_get_flags(ap);
+
+                        NMLOG_INFO("AP Flags: 0x%x\n", flags);
+
+                        if (flags & NM_802_11_AP_FLAGS_WPS_PBC) {
+                            GBytes *ssid;
+                            gsize size;
+                            ssid = nm_access_point_get_ssid(ap);
+                            const guint8 *ssidData = static_cast<const guint8 *>(g_bytes_get_data(ssid, &size));
+                            std::string ssidTmp(reinterpret_cast<const char *>(ssidData), size);
+                            NMLOG_INFO("ssid to connect: %s", ssidTmp.c_str());
+                            ssid_in = ssidTmp;
+                            ssidFound = true;
+                            NMLOG_INFO("-------------------- Found PBC AP -------------------");
+                            break;
+                        }
+                    }
+                    NMLOG_INFO("End of loop");
+                }
+                count++;
+            }while(count <= 6 && !ssidFound);
+            if(!ssidFound)
             {
-                NMLOG_ERROR("WPS failed to connect with the SSID");
                 g_main_context_pop_thread_default(wpsContext);
                 g_main_context_release(wpsContext);
-                return ;
-            }
-            pclose(fp);
-            std::string wpaCliStatus = WPA_CLI_STATUS;
-            clock_gettime(CLOCK_MONOTONIC, &startTime);
-            NMLOG_DEBUG("-------------------4-------------------------");
-            NMLOG_INFO("outside wpsConnect is %d", wpsConnect);
-            while(!wpsStop.load())
-            {
-                fp = popen(wpaCliStatus.c_str(), "r");
-                if (fp == nullptr)
-                {
-                    NMLOG_ERROR("WPS not able to fetch the connection status");
-                    continue;
-                }
-                while (fgets(buffer.data(), buffer.size(), fp) != nullptr)
-                {
-                    wpaCliResult += buffer.data();
-                }
-                pclose(fp);
-                wpsConnect = (wpaCliResult.find("wpa_state=COMPLETED") != std::string::npos);
-                clock_gettime(CLOCK_MONOTONIC, &endTime);
-                timeDiff = (endTime.tv_sec - startTime.tv_sec);
-                NMLOG_DEBUG("Time elapsed before getting wifi connected = %ld", timeDiff);
-                if(wpsConnect || timeDiff > 120)
-                {
-                    NMLOG_INFO("wpsConnect is %d", wpsConnect);
-                    break;
-                }
-                sleep(5);
-            }
-
-            if(!wpsConnect)
-            {
-                NMLOG_INFO("Inside !wpsConnect is %d", wpsConnect);
-                g_main_context_pop_thread_default(wpsContext);
-                g_main_context_release(wpsContext);/* TODO: Need to disconnect the wpa_cli connection, as the libnm is not aware of the connection created by wpa_cli */
                 return;
             }
-
-            while(count < 2 && !ssidFound)
+            device = getNmDevice();
+            if(device == NULL)
             {
-                std::ifstream configFile(WPA_SUPPLICANT_CONF);
-                if (!configFile.is_open())
-                {
-                    NMLOG_ERROR("WPS connected with an SSID but not able to fetch IP address");
-                    g_main_context_pop_thread_default(wpsContext);
-                    g_main_context_release(wpsContext);
-                    return;
-                }
+                g_main_context_pop_thread_default(wpsContext);
+                g_main_context_release(wpsContext);
 
-                NMLOG_INFO("Printing the content of /opt/secure/wifi/wpa_supplicant.conf");
-                NMLOG_INFO("popening %s", catCommand.c_str());
-                fp = popen(catCommand.c_str(), "r");
-                if (fp == nullptr)
-                {
-                    NMLOG_ERROR("cat command popen failed");
-                    return;
-                }
-                while (fgets(buffer2.data(), buffer2.size(), fp) != nullptr) {
-                    std::cout << buffer2.data();
-                    NMLOG_INFO("buffer2.data() = %s", buffer2.data());
-                }
-                pclose(fp);
-                while (std::getline(configFile, line))
-                {
-                    NMLOG_INFO("Inside getline while");
-                    size_t pos;
+                NMLOG_INFO("device is NULL");
+                return;
+            }
+            availableConnections = nm_device_get_available_connections(device);
+            for (guint i = 0; i < availableConnections->len; i++)
+            {
+                NMConnection *currentConnection = static_cast<NMConnection*>(g_ptr_array_index(availableConnections, i));
+                const char   *id = nm_connection_get_id(NM_CONNECTION(currentConnection));
 
-                    // Fetch ssid value
-                    pos = line.find(ssidPattern);
-                    if (pos != std::string::npos)
-                    {
-                        pos += ssidPattern.length();
-                        size_t end = line.find('"', pos + 1);
-                        if (end == std::string::npos)
-                        {
-                            end = line.length();
-                        }
-                        ssid = line.substr(pos + 1, end - pos - 1);
-                        ssidFound = true;
-                        NMLOG_INFO("SSID found");
+                if (!ssid_in.empty()) {
+                    if (!id || strcmp(id, ssid_in.c_str()))
                         continue;
-                    }
-
-                    if (ssidFound) {
-                        // Fetch security value
-                        pos = line.find(securityPattern);
-                        if (pos != std::string::npos)
-                        {
-                            pos += securityPattern.length();
-                            size_t end = line.find(' ', pos);
-                            if (end == std::string::npos)
-                            {
-                                end = line.length();
-                            }
-                            security = line.substr(pos, end - pos);
-                            continue;
-                        }
-
-                        // Fetch passphare value
-                        pos = line.find(passphrasePattern);
-                        if (pos != std::string::npos)
-                        {
-                            pos += passphrasePattern.length();
-                            size_t end = line.find('"', pos + 1);
-                            if (end == std::string::npos)
-                            {
-                                end = line.length();
-                            }
-                            passphrase = line.substr(pos + 1, end - pos - 1);
-                        }
-                        NMLOG_INFO("Completed getline while");
-                    }
                 }
-                if(ssid.empty())
-                {
-                    count++;
-                    NMLOG_INFO("SSID not found retrying with 5 sec delay");
-                    sleep(5);
-                }
-                else
-                {
-                    NMLOG_INFO("ssid value = %s", ssid.c_str());
-                    wifiData.ssid = ssid;
-                    wifiData.passphrase = passphrase;
-                    if(security == "WPA-PSK")
-                        wifiData.security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK_AES;
-                    else if(security == "WPA2-PSK")
-                        wifiData.security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA2_PSK_AES;
-                    loop = g_main_loop_new(wpsContext, FALSE);
-                    if(this->wifiConnect(wifiData))
-                        NMLOG_INFO("WPS connected successfully");
-                    else
-                        NMLOG_ERROR("WPS connect failed");/* TODO: Need to disconnect the wpa_cli connection, as the libnm is not aware of the connection created by wpa_cli */
-                    loop = g_main_loop_new(nmContext, FALSE);
+
+                if (nm_access_point_connection_valid(ap, NM_CONNECTION(currentConnection))) {
+                    connection = g_object_ref(currentConnection);
+                    NMLOG_INFO("Connection '%s' exists !", ssid_in.c_str());
                     break;
                 }
-                configFile.close();
             }
-            NMLOG_INFO("wpsAction cleanup start");
+
+            if(!connection)
+            {
+                std::string connAddCommand = "nmcli connection add type wifi ifname " + std::string(nm_device_get_iface(device)) + " con-name " + ssid_in + " ssid " + ssid_in;
+                NMLOG_INFO("connAddCommand = %s", connAddCommand.c_str());
+                fp = popen(connAddCommand.c_str(), "r");
+                if (fp == nullptr) {
+                    NMLOG_ERROR("popen failed");
+                    return ;
+                }
+                else
+                    NMLOG_INFO("connAddCommand success");
+                pclose(fp);
+                NMLOG_INFO("ssid_in = %s", ssid_in.c_str());
+                std::string connSecurityCommand = "nmcli connection modify " + ssid_in + " wifi-sec.key-mgmt wpa-psk";
+                NMLOG_INFO("connSecurityCommand = %s", connSecurityCommand.c_str());
+                fp = popen(connSecurityCommand.c_str(), "r");
+                if (fp == nullptr) {
+                    NMLOG_ERROR("popen failed");
+                    return ;
+                }
+                else
+                    NMLOG_INFO("connSecurityCommand success");
+                pclose(fp);
+            }
+            NMLOG_INFO("ssid_in = %s", ssid_in.c_str());
+            std::string ConnActivateCommand = "nmcli -w 10 connection up " + ssid_in + " --ask";
+            NMLOG_INFO("ConnActivateCommand = %s", ConnActivateCommand.c_str());
+            int result = std::system(ConnActivateCommand.c_str());
+            if (result != 0) {
+                NMLOG_ERROR("nmcli connection up failed");
+            }
+            else
+            {
+                wpsConnected = 1;
+                NMLOG_INFO("connActivateCommand success");
+            }
+
+            loop = g_main_loop_new(nmContext, FALSE);
+
             g_main_context_pop_thread_default(wpsContext);
             g_main_context_release(wpsContext);
             if (wpsContext) {
-                    g_main_context_unref(wpsContext);
-                    wpsContext = nullptr;
+                g_main_context_unref(wpsContext);
+                wpsContext = nullptr;
             }
-            NMLOG_INFO("wpsAction cleanup end");
+
             return;
         }
 
