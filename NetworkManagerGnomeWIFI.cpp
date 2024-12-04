@@ -1070,7 +1070,7 @@ namespace WPEFramework
                 pclose(fp);
             }
             NMLOG_INFO("ssid_in = %s", ssid_in.c_str());
-            std::string ConnActivateCommand = "nmcli -w 10 connection up " + ssid_in + " --ask";
+            std::string ConnActivateCommand = "nmcli -w 30 connection up " + ssid_in + " --ask";
             NMLOG_INFO("ConnActivateCommand = %s", ConnActivateCommand.c_str());
             int result = std::system(ConnActivateCommand.c_str());
             if (result != 0) {
