@@ -1065,6 +1065,7 @@ namespace WPEFramework
                 return;
             }
 
+            count = 0;
             while(count < 2 && !ssidFound)
             {
                 std::ifstream configFile(WPA_SUPPLICANT_CONF);
