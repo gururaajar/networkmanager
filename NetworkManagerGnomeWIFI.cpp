@@ -962,6 +962,7 @@ namespace WPEFramework
             long timeDiff = 0;
             std::array<char, 128> buffer2;
             int count = 0;
+            bool scanResult = false;
             bool ssidFound = false;
             const char* bssid = nullptr;
             gboolean pbcFound = false;
