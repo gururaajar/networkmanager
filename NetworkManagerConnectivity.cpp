@@ -733,8 +733,10 @@ namespace WPEFramework
             
         } while(doConnectivityMonitor);
 
-        if(!doContinuousMonitor)
-            m_InternetState = nsm_internetState::UNKNOWN; // no continous monitor running reset to unknow
+        m_InternetState = nsm_internetState::UNKNOWN; // no continous monitor running reset to unknow
+        m_Ipv4InternetState = nsm_internetState::UNKNOWN;
+        m_Ipv6InternetState = nsm_internetState::UNKNOWN;
+
         NMLOG_DEBUG("initial connectivity monitor exit");
     }
 
