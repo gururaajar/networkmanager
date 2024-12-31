@@ -44,6 +44,8 @@ namespace WPEFramework
                 NetworkManagerClient(const NetworkManagerClient&) = delete;
                 NetworkManagerClient& operator=(const NetworkManagerClient&) = delete;
 
+                bool getAvailableInterfaces(std::vector<Exchange::INetworkManager::InterfaceDetails>& interfaceList);
+                bool setPrimaryInterface(const std::string interface);
                 bool getKnownSSIDs(std::list<std::string>& ssids);
                 bool getAvailableSSIDs(std::list<std::string>& ssids);
                 bool getConnectedSSID(Exchange::INetworkManager::WiFiSSIDInfo& ssidinfo);

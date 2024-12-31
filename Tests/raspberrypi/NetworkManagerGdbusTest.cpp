@@ -67,6 +67,8 @@ void displayMenu()
     std::cout << "8. WiFi Disconnect" << std::endl;
     std::cout << "9. Get WiFi State" << std::endl;
     std::cout << "10. Get WiFi Signal Strength" << std::endl;
+    std::cout << "11. GetAvailableInterface" << std::endl;
+    std::cout << "12. SetPrimaryInterface" << std::endl;
     std::cout << "0. Exit" << std::endl;
     std::cout << "-------------------------------------" << std::endl;
 }
@@ -256,6 +258,32 @@ int main()
                     NMLOG_ERROR("Failed to get WiFi signal strength");
                 }
                 break;
+            }
+            case 11: {
+                std::vector<Exchange::INetworkManager::InterfaceDetails> interfaceList;
+                if(nmClient->getAvailableInterfaces(interfaceList)){
+                    for (const auto& interface : interfaceList) {
+                        NMLOG_INFO("interface.type = %d interface.name = %s interface.mac = %s interface.enabled = %d interface.connected = %d", interface.type, interface.name.c_str(), interface.mac.c_str(), interface.enabled, interface.connected);
+                    }
+                }
+                else
+                {
+                    NMLOG_ERROR("Failed to get Available Interfaces");
+                }
+                     }
+            case 12: {
+                std::string interface;
+                std::cout << "Enter interface name to set as primary: ";
+                std::cin.ignore();
+                std::getline(std::cin, interface);
+
+                if(nmClient->setPrimaryInterface(interface)){
+                    NMLOG_INFO("setPrimaryInterface successful");
+                }
+                else
+                {
+                    NMLOG_ERROR("Failed to set Primary Interface");
+                }
             }
 
             case 0:
