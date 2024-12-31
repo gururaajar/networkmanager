@@ -46,26 +46,42 @@ namespace WPEFramework
 
         uint32_t NetworkManagerImplementation::GetAvailableInterfaces (Exchange::INetworkManager::IInterfaceDetailsIterator*& interfacesItr/* @out */)
         {
-            uint32_t rc = Core::ERROR_GENERAL;                                                                                                              
-            if(_nmGdbusClient->wifiConnect(ssid))                                                                                                           
-                rc = Core::ERROR_NONE;                                                                                                                      
-            else                                                                                                                                            
-                NMLOG_ERROR("WiFiConnect failed");                                                                                                          
-            return rc; 
+            uint32_t rc = Core::ERROR_GENERAL;
+            std::vector<Exchange::INetworkManager::InterfaceDetails> interfaceList;
+            if(_nmGdbusClient->getAvailableInterfaces(interfaceList))
+                rc = Core::ERROR_NONE;
+            else
+                NMLOG_ERROR("GetAvailableInterfaces failed");
+            return rc;
         }
 
-        uint32_t NetworkManagerImplementation::GetPrimaryInterface (string& interface /* @out */)
+        uint32_t NetworkManagerImplementation::GetPrimaryInterface ()
         {
-           return Core::ERROR_NONE;
+            uint32_t rc = Core::ERROR_GENERAL;
+            if(_nmGdbusClient->getPrimaryInterface())
+                rc = Core::ERROR_NONE;
+            else
+                NMLOG_ERROR("GetPrimaryInterface failed");
+            return rc;
         }
 
         uint32_t NetworkManagerImplementation::SetPrimaryInterface (const string& interface/* @in */)
         {
-            return Core::ERROR_NONE;
+            uint32_t rc = Core::ERROR_GENERAL;
+            if(_nmGdbusClient->setPrimaryInterface(interface))
+                rc = Core::ERROR_NONE;
+            else
+                NMLOG_ERROR("SetPrimaryInterface failed");
+            return rc;
         }
         uint32_t NetworkManagerImplementation::SetInterfaceState(const string& interface/* @in */, const bool enabled /* @in */)
         {
-            return Core::ERROR_NONE;
+            uint32_t rc = Core::ERROR_GENERAL;
+            if(_nmGdbusClient->setInterfaceState(interface, enabled))
+                rc = Core::ERROR_NONE;
+            else
+                NMLOG_ERROR("SetInterfaceState failed");
+            return rc;
         }
 
         uint32_t NetworkManagerImplementation::GetInterfaceState(const string& interface/* @in */, bool& isEnabled /* @out */)
@@ -82,7 +98,12 @@ namespace WPEFramework
         /* @brief Set IP Address Of the Interface */
         uint32_t NetworkManagerImplementation::SetIPSettings(const string& interface /* @in */, const IPAddress& address /* @in */)
         {
-            return Core::ERROR_NONE;
+            uint32_t rc = Core::ERROR_GENERAL;
+            if(_nmGdbusClient->setIPSettings(interface, address))
+                rc = Core::ERROR_NONE;
+            else
+                NMLOG_ERROR("SetInterfaceState failed");
+            return rc;
         }
 
         uint32_t NetworkManagerImplementation::StartWiFiScan(const string& frequency /* @in */, IStringIterator* const ssids/* @in */)

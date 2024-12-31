@@ -259,6 +259,29 @@ namespace WPEFramework
             return proxy;
         }
 
+        GDBusProxy* DbusMgr::getNetworkManagerPropertyProxy(const char* devicePath)
+        {
+            GError* error = NULL;
+            GDBusProxy* proxy = g_dbus_proxy_new_sync(
+                    getConnection(),
+                    G_DBUS_PROXY_FLAGS_NONE,
+                    nullptr,
+                    "org.freedesktop.NetworkManager",
+                    devicePath,
+                    "org.freedesktop.DBus.Properties",
+                    NULL,
+                    &error
+            );
+
+            if (error != NULL) {
+                g_dbus_error_strip_remote_error(error);
+                NMLOG_ERROR("Failed to create property proxy: %s", error->message);
+                g_error_free(error);
+                return NULL;
+            }
+            return proxy;
+        }
+
     } // Plugin
 } // WPEFramework
 

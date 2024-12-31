@@ -45,6 +45,7 @@ namespace WPEFramework
                 GDBusProxy* getNetworkManagerActiveConnProxy(const char* activePath);
                 GDBusProxy* getNetworkManagerAccessPointProxy(const char* apPath);
                 GDBusConnection* getConnection();
+                GDBusProxy* getNetworkManagerPropertyProxy(const char* devicePath);
 
             private:
                 GDBusConnection* connection;

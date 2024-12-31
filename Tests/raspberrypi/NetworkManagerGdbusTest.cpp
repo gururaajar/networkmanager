@@ -67,6 +67,10 @@ void displayMenu()
     std::cout << "8. WiFi Disconnect" << std::endl;
     std::cout << "9. Get WiFi State" << std::endl;
     std::cout << "10. Get WiFi Signal Strength" << std::endl;
+    std::cout << "11. GetAvailableInterface" << std::endl;
+    std::cout << "12. SetPrimaryInterface" << std::endl;
+    std::cout << "13. SetInterfaceState" << std::endl;
+    std::cout << "14. SetIPSettings" << std::endl;
     std::cout << "0. Exit" << std::endl;
     std::cout << "-------------------------------------" << std::endl;
 }
@@ -257,6 +261,105 @@ int main()
                 }
                 break;
             }
+            case 11: {
+                std::vector<Exchange::INetworkManager::InterfaceDetails> interfaceList;
+                if(nmClient->getAvailableInterfaces(interfaceList)){
+                    for (const auto& interface : interfaceList) {
+                        NMLOG_INFO("interface.type = %d interface.name = %s interface.mac = %s interface.enabled = %d interface.connected = %d", interface.type, interface.name.c_str(), interface.mac.c_str(), interface.enabled, interface.connected);
+                    }
+                }
+                else
+                {
+                    NMLOG_ERROR("Failed to get Available Interfaces");
+                }
+            }
+            case 12: {
+                std::string interface;
+                std::cout << "Enter interface name to set as primary: ";
+                std::cin.ignore();
+                std::getline(std::cin, interface);
+
+                if(nmClient->setPrimaryInterface(interface)){
+                    NMLOG_INFO("setPrimaryInterface successful");
+                }
+                else
+                {
+                    NMLOG_ERROR("Failed to set Primary Interface");
+                }
+            }
+            case 13: {
+                std::string interface;
+                std::string input;
+                bool enable;
+                std::cout << "Enter interface name to set as primary: ";
+                std::cin.ignore();
+                std::getline(std::cin, interface);
+                std::cout << "Enable Interface(input true/false): ";
+                std::getline(std::cin, input);
+                enable = (input == "true")? true: false;
+
+                if(nmClient->setInterfaceState(interface, enable)){
+                    NMLOG_INFO("setInterfaceState successful");
+                }
+                else
+                {
+                    NMLOG_ERROR("Failed to set Interface State");
+                }
+            }
+            case 14: {
+                std::string interface;
+                std::string ipVersion;
+                std::string input;
+                bool autoConfig;
+                std::string ipAddress;
+                uint32_t prefix;
+                std::string gateway;
+                std::string primarydns;
+                std::string secondarydns;
+                Exchange::INetworkManager::IPAddress address;
+                std::cout << "Enter interface: ";
+                std::cin.ignore();
+                std::getline(std::cin, interface);
+
+                std::cout << "Enter IP version: ";
+                std::getline(std::cin, ipVersion);
+
+                std::cout << "Enter auto configuration setting(input true/false): ";
+                std::getline(std::cin, input);
+                autoConfig = (input == "true")? true: false;
+
+                std::cout << "Enter IP address: ";
+                std::getline(std::cin, ipAddress);
+
+                // For prefix, use std::cin because it's a uint32_t
+                std::cout << "Enter prefix length: ";
+                std::cin >> prefix;
+                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ignore leftover newline
+
+                std::cout << "Enter gateway: ";
+                std::getline(std::cin, gateway);
+
+                std::cout << "Enter primary DNS: ";
+                std::getline(std::cin, primarydns);
+
+                std::cout << "Enter secondary DNS: ";
+                std::getline(std::cin, secondarydns);
+                address.ipversion = ipVersion;
+                address.autoconfig = autoConfig;
+                address.ipaddress = ipAddress;
+                address.prefix = prefix;
+                address.gateway = gateway;
+                address.primarydns = primarydns;
+                address.secondarydns = secondarydns;
+                if(nmClient->setIPSettings(interface, address)){
+                    NMLOG_INFO("setIPSettings successful");
+                }
+                else
+                {
+                    NMLOG_ERROR("Failed to set IP settings");
+                }
+            }
+ 
 
             case 0:
                 std::cout << "Exiting program." << std::endl;
