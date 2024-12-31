@@ -339,49 +339,39 @@ namespace WPEFramework
             return ret;
         }
 
-        bool GnomeUtils::getDeviceByIpIface(DbusMgr& m_dbus, const gchar *iface_name, std::string& path)
+        bool GnomeUtils::getDeviceByIpIface(DbusMgr& m_dbus, const gchar *ifaceName, std::string& path)
         {
-            // TODO Fix Error calling method: 
-            // GDBus.Error:org.freedesktop.NetworkManager.UnknownDevice: No device found for the requested iface 
-            // in wsl linux
-            GError *error = NULL;
-            GVariant *result;
-            gchar *device_path = NULL;
-            bool ret = false;
+            GError *error = nullptr;
+            GDBusProxy* nmProxy  = m_dbus.getNetworkManagerProxy();
+            if(nmProxy == NULL)
+                return false;
 
-            result = g_dbus_connection_call_sync(
-                m_dbus.getConnection(),
-                "org.freedesktop.NetworkManager",               // D-Bus name
-                "/org/freedesktop/NetworkManager",              // Object path
-                "org.freedesktop.NetworkManager",               // Interface
-                "GetDeviceByIpIface",                           // Method name
-                g_variant_new("(s)", iface_name),               // Input parameter (the interface name)
-                G_VARIANT_TYPE("(o)"),                          // Expected return type (object path)
-                G_DBUS_CALL_FLAGS_NONE,
-                -1,                                             // Default timeout
-                NULL,
-                &error
-            );
+            GVariant *result = g_dbus_proxy_call_sync(
+                    nmProxy,
+                    "GetDeviceByIpIface",
+                    g_variant_new("(s)", ifaceName),
+                    G_DBUS_CALL_FLAGS_NONE,
+                    -1,
+                    nullptr,
+                    &error);
 
-            if (error != NULL) {
-                NMLOG_ERROR("calling GetDeviceByIpIface: %s", error->message);
-                g_error_free(error);
-                return ret;
+            if (result == nullptr) {
+                NMLOG_ERROR("Error calling GetDeviceByIpIface: %s", error->message);
+                g_clear_error(&error);
+                g_object_unref(nmProxy);
+                return false;
             }
 
-            if (g_variant_is_of_type (result, (const GVariantType *) "(o)"))
-            {
-                g_variant_get(result, "(o)", &device_path);
-                if(device_path != NULL)
-                {
-                    path = std::string(device_path);
-                    ret = true;
-                    g_free(device_path);
-                }
-            }
-            //NMLOG_DEBUG("%s device path %s", iface_name, path.c_str());
+            gchar *devicePath;
+            g_variant_get(result, "(o)", &devicePath);
+
             g_variant_unref(result);
-            return ret;
+            g_object_unref(nmProxy);
+
+            path = std::string(devicePath);
+            g_free(devicePath);
+
+            return true;
         }
 
         bool GnomeUtils::getApDetails(DbusMgr& m_dbus, const char* apPath, Exchange::INetworkManager::WiFiSSIDInfo& wifiInfo)
@@ -960,6 +950,7 @@ namespace WPEFramework
             g_object_unref(deviceProxy);
             return true;
         }
+
         // Convert IPv4 string to network byte order (NBO)
         uint32_t GnomeUtils::ip4_str_to_nbo(const std::string &ipAddress)
         {
@@ -969,6 +960,26 @@ namespace WPEFramework
             }
             return addr.s_addr;
         }
+
+        // Helper function to convert a raw IPv4 address to human-readable format
+        std::string GnomeUtils::ipToString(uint32_t ip) {
+            ip = ntohl(ip); // Convert from network to host byte order
+            char buf[INET_ADDRSTRLEN];
+            snprintf(buf, sizeof(buf), "%u.%u.%u.%u",
+                    (ip >> 24) & 0xFF,
+                    (ip >> 16) & 0xFF,
+                    (ip >>  8) & 0xFF,
+                    ip & 0xFF);
+            return std::string(buf);
+        }
+
+        // Helper function to convert a raw IPv6 address to human-readable format
+        std::string GnomeUtils::ip6ToString(const uint8_t *ipv6) {
+            char buf[INET6_ADDRSTRLEN];
+            inet_ntop(AF_INET6, ipv6, buf, sizeof(buf));
+            return std::string(buf);
+        }
+
 
     } // Plugin
 } // WPEFramework

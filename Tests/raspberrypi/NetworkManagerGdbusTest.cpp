@@ -71,6 +71,9 @@ void displayMenu()
     std::cout << "12. SetPrimaryInterface" << std::endl;
     std::cout << "13. SetInterfaceState" << std::endl;
     std::cout << "14. SetIPSettings" << std::endl;
+    std::cout << "15. GetPrimaryInterface" << std::endl;
+    std::cout << "16. GetInterfaceState" << std::endl;
+    std::cout << "17. GetIPSettings" << std::endl;
     std::cout << "0. Exit" << std::endl;
     std::cout << "-------------------------------------" << std::endl;
 }
@@ -272,6 +275,7 @@ int main()
                 {
                     NMLOG_ERROR("Failed to get Available Interfaces");
                 }
+                break;
             }
             case 12: {
                 std::string interface;
@@ -286,12 +290,13 @@ int main()
                 {
                     NMLOG_ERROR("Failed to set Primary Interface");
                 }
+                break;
             }
             case 13: {
                 std::string interface;
                 std::string input;
                 bool enable;
-                std::cout << "Enter interface name to set as primary: ";
+                std::cout << "Enter interface name to change the state: ";
                 std::cin.ignore();
                 std::getline(std::cin, interface);
                 std::cout << "Enable Interface(input true/false): ";
@@ -305,6 +310,7 @@ int main()
                 {
                     NMLOG_ERROR("Failed to set Interface State");
                 }
+                break;
             }
             case 14: {
                 std::string interface;
@@ -321,7 +327,7 @@ int main()
                 std::cin.ignore();
                 std::getline(std::cin, interface);
 
-                std::cout << "Enter IP version: ";
+                std::cout << "Enter IP version: (IPv4/IPv6)";
                 std::getline(std::cin, ipVersion);
 
                 std::cout << "Enter auto configuration setting(input true/false): ";
@@ -358,6 +364,52 @@ int main()
                 {
                     NMLOG_ERROR("Failed to set IP settings");
                 }
+                break;
+            }
+            case 15: {
+                std::string interface;
+
+                if(nmClient->getPrimaryInterface(interface)){
+                    NMLOG_INFO("Primary Interface = %s", interface.c_str());
+                }
+                else
+                {
+                    NMLOG_ERROR("Failed to Get Primary Interface");
+                }
+                break;
+            }
+            case 16: {
+                std::string interface;
+                bool isEnabled;
+                std::cout << "Enter interface: ";
+                std::cin.ignore();
+                std::getline(std::cin, interface);
+                if(nmClient->getInterfaceState(interface, isEnabled)){
+                    NMLOG_INFO("Interface %s is %s", interface.c_str(), isEnabled ? "enabled": "disabled");
+                }
+                else
+                {
+                    NMLOG_ERROR("Failed to Get Interface state");
+                }
+                break;
+            }
+            case 17: {
+                std::string interface;
+                std::string ipVersion;
+                Exchange::INetworkManager::IPAddress result;
+                std::cout << "Enter interface: ";
+                std::cin.ignore();
+                std::getline(std::cin, interface);
+                std::cout << "Enter IP version(IPv4/IPv6): ";
+                std::getline(std::cin, ipVersion);
+                if(nmClient->getIPSettings(interface, ipVersion, result)){
+                    NMLOG_INFO("\nresult.ipversion = %s\n result.autoconfig = %d\n result.dhcpserver = %s\n result.ula = %s\n result.ipaddress = %s\n result.prefix = %d\nresult.gateway = %s\n result.primarydns = %s\n result.secondarydns = %s\n", result.ipversion.c_str(), result.autoconfig, result.dhcpserver.c_str(), result.ula.c_str(), result.ipaddress.c_str(), result.prefix, result.gateway.c_str(), result.primarydns.c_str(), result.secondarydns.c_str());
+                }
+                else
+                {
+                    NMLOG_ERROR("Failed to get IP Settings");
+                }
+                break;
             }
  
 

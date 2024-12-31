@@ -82,6 +82,8 @@ namespace WPEFramework
                 static bool getConnectionProfile(DbusMgr& m_dbus, const std::string interfaceName, std::string& connectionProfile);
                 static bool updateInterfaceState(DbusMgr& m_dbus, const std::string& devicePath, bool enable);
                 static uint32_t ip4_str_to_nbo(const std::string &ipAddress);
+                static std::string ipToString(uint32_t ip);
+                static std::string ip6ToString(const uint8_t *ipv6);
 
                 static bool convertSsidInfoToJsonObject(Exchange::INetworkManager::WiFiSSIDInfo& wifiInfo, JsonObject& ssidObj);
                 static const char* convertPercentageToSignalStrengtStr(int percentage);

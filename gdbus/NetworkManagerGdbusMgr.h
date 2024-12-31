@@ -46,6 +46,8 @@ namespace WPEFramework
                 GDBusProxy* getNetworkManagerAccessPointProxy(const char* apPath);
                 GDBusConnection* getConnection();
                 GDBusProxy* getNetworkManagerPropertyProxy(const char* devicePath);
+                GDBusProxy* getNetworkManagerDhcpv4Proxy(const char* dhcpConfigPath);
+                GDBusProxy* getNetworkManagerDhcpv6Proxy(const char* dhcpConfigPath);
 
             private:
                 GDBusConnection* connection;

@@ -556,20 +556,195 @@ namespace WPEFramework
             return true;
         }
 
-        /*bool NetworkManagerClient::GetPrimaryInterface()
+        bool NetworkManagerClient::getPrimaryInterface(std::string& interface)
         {
-            std::string PrimaryConnectionPath;
-            if(!GnomeUtils::getPrimaryConnectionPath(PrimaryConnectionPath)
+            GError* error = nullptr;
+            std::string primaryConnectionPath;
+            GDBusProxy *nmProxy = NULL;
+            nmProxy = m_dbus.getNetworkManagerPropertyProxy("/org/freedesktop/NetworkManager");
+            if(nmProxy == NULL)
                 return false;
-        }*/
+
+            GVariant* result = g_dbus_proxy_call_sync(
+                    nmProxy,
+                    "Get",
+                    g_variant_new("(ss)", "org.freedesktop.NetworkManager", "PrimaryConnection"),
+                    G_DBUS_CALL_FLAGS_NONE,
+                    -1,
+                    nullptr,
+                    &error
+                    );
+
+            if (error) {
+                NMLOG_ERROR("Error: Getting primary connection path %s",error->message);
+                g_error_free(error);
+                return false;
+            }
+
+            if (result != NULL) {
+                GVariant* value;
+                g_variant_get(result, "(v)", &value);
+                if (g_variant_is_of_type(value, G_VARIANT_TYPE_OBJECT_PATH)) {
+                    primaryConnectionPath = g_variant_get_string(value, nullptr);
+                } else {
+                    NMLOG_ERROR("Expected object path but got different type");
+                }
+                g_variant_unref(value);
+                g_variant_unref(result);
+            }
+
+            GDBusProxy* deviceProxy = m_dbus.getNetworkManagerPropertyProxy(primaryConnectionPath.c_str());
+            if(deviceProxy == NULL)
+                return false;
+
+            std::string defaultDevicePath;
+
+            result = g_dbus_proxy_call_sync(
+                    deviceProxy,
+                    "Get",
+                    g_variant_new("(ss)", "org.freedesktop.NetworkManager.Connection.Active", "Devices"),
+                    G_DBUS_CALL_FLAGS_NONE,
+                    -1,
+                    nullptr,
+                    &error
+            );
+
+            if (error) {
+                NMLOG_ERROR("Error: Getting default device path %s", error->message);
+                g_error_free(error);
+                return false;
+            }
+
+            if (result != nullptr) {
+                GVariant* value;
+                g_variant_get(result, "(v)", &value);
+                if (g_variant_is_of_type(value, G_VARIANT_TYPE_ARRAY)) {
+                    GVariantIter* iter;
+                    const gchar* devicePath;
+                    g_variant_get(value, "ao", &iter);
+
+                    if (g_variant_iter_loop(iter, "o", &devicePath)) {
+                        defaultDevicePath = devicePath;
+                    }
+                    g_variant_iter_free(iter);
+                } else {
+                    NMLOG_ERROR("Expected array of object paths but got different type");
+                }
+                g_variant_unref(value);
+                g_variant_unref(result);
+            }
+            GDBusProxy* defaultDeviceProxy = m_dbus.getNetworkManagerPropertyProxy(defaultDevicePath.c_str());
+            if(defaultDeviceProxy == NULL)
+                return false;
+
+            error = nullptr;
+            result = g_dbus_proxy_call_sync(
+                    defaultDeviceProxy,
+                    "Get",
+                    g_variant_new("(ss)", "org.freedesktop.NetworkManager.Device", "Interface"),
+                    G_DBUS_CALL_FLAGS_NONE,
+                    -1,
+                    nullptr,
+                    &error
+                    );
+
+            if (error) {
+                NMLOG_ERROR("Error: Getting primary interface %s", error->message);
+                g_error_free(error);
+                return false;
+            }
+
+            if (result != nullptr) {
+                GVariant* value;
+                g_variant_get(result, "(v)", &value);
+                if (g_variant_is_of_type(value, G_VARIANT_TYPE_STRING)) {
+                    interface = g_variant_get_string(value, nullptr);
+                } else {
+                    NMLOG_ERROR("Expected string but got different type");
+                }
+                g_variant_unref(value);
+                g_variant_unref(result);
+            }
+
+            g_object_unref(defaultDeviceProxy);
+            g_object_unref(deviceProxy);
+            g_object_unref(nmProxy);
+            return true;
+        }
 
         bool NetworkManagerClient::setInterfaceState(const std::string& interface, bool enable)
         {
             deviceInfo devInfo{};
+            GError* error = nullptr;
             if(!GnomeUtils::getDeviceInfoByIfname(m_dbus, interface.c_str(), devInfo))
                 return false;
-            if(!GnomeUtils::updateInterfaceState(m_dbus, devInfo.path, enable))
+
+            GDBusProxy* deviceProxy = m_dbus.getNetworkManagerPropertyProxy(devInfo.path.c_str());
+            if(deviceProxy == NULL)
                 return false;
+
+            GVariant* result = g_dbus_proxy_call_sync(
+                    deviceProxy,
+                    "Set",
+                    g_variant_new("(ssv)", "org.freedesktop.NetworkManager.Device", "Managed", g_variant_new_boolean(enable)),
+                    G_DBUS_CALL_FLAGS_NONE,
+                    -1,
+                    nullptr,
+                    &error
+                    );
+
+            if (error) {
+                NMLOG_ERROR("Error %s network interface: %s", (enable ? "enabling" : "disabling"), error->message);
+                g_error_free(error);
+            } else {
+                NMLOG_DEBUG("Network interface %s successfully %s", (enable ? "enabled" : "disabled"), devInfo.path.c_str());
+                if (result != nullptr) {
+                    g_variant_unref(result);
+                }
+            }
+            g_object_unref(deviceProxy);
+            return true;
+        }
+
+        bool NetworkManagerClient::getInterfaceState(const std::string& interface, bool& isEnabled)
+        {
+            deviceInfo devInfo{};
+            if(!GnomeUtils::getDeviceInfoByIfname(m_dbus, interface.c_str(), devInfo))
+                return false;
+
+            GError* error = nullptr;
+            GDBusProxy* deviceProxy = m_dbus.getNetworkManagerPropertyProxy(devInfo.path.c_str());
+            if(deviceProxy == NULL)
+                return false;
+
+            // Call the "Get" method using the proxy
+            GVariant* result = g_dbus_proxy_call_sync(
+                    deviceProxy,
+                    "Get",
+                    g_variant_new("(ss)", "org.freedesktop.NetworkManager.Device", "Managed"),
+                    G_DBUS_CALL_FLAGS_NONE,
+                    -1,
+                    nullptr,
+                    &error
+                    );
+
+            if (error != nullptr) {
+                NMLOG_ERROR("Error getting network interface state: %s", error->message);
+                g_error_free(error);
+            } else {
+                NMLOG_DEBUG("Network interface state retrieved successfully: %s",devInfo.path.c_str());
+                GVariant* managedVariant;
+                g_variant_get(result, "(v)", &managedVariant);
+
+                //gboolean managed = g_variant_get_boolean(managedVariant);
+                isEnabled = g_variant_get_boolean(managedVariant);
+                g_variant_unref(managedVariant);
+
+                NMLOG_DEBUG("Interface %s is %s", interface.c_str(), isEnabled ? "enabled" : "disabled");
+
+                g_variant_unref(result);
+            }
+
             return true;
         }
 
@@ -665,6 +840,320 @@ namespace WPEFramework
                 return false;
             }
 
+            return true;
+        }
+
+        bool NetworkManagerClient::getIPSettings(const std::string& interface, const std::string& ipversion, Exchange::INetworkManager::IPAddress& result)
+        {
+            std::string devicePath;
+            if(!GnomeUtils::getDeviceByIpIface(m_dbus, interface.c_str(), devicePath))
+                return false;
+            GDBusProxy *deviceProxy = m_dbus.getNetworkManagerDeviceProxy(devicePath.c_str());
+            if(deviceProxy == NULL)
+                return false;
+            if (g_strcmp0(ipversion.c_str(), "IPv4") == 0)
+            {
+                GVariant *ip4Property = g_dbus_proxy_get_cached_property(deviceProxy, "Ip4Config");
+                if (ip4Property == NULL) {
+                    NMLOG_ERROR("Failed to get Ip4Config property");
+                    g_object_unref(deviceProxy);
+                    return false;
+                }
+
+                GVariant *dhcp4Property = g_dbus_proxy_get_cached_property(deviceProxy, "Dhcp4Config");
+                if (dhcp4Property == NULL) {
+                    NMLOG_ERROR("Failed to get Dhcp4Config property");
+                    g_object_unref(deviceProxy);
+                    return false;
+                }
+
+                gchar *dhcp4ConfigPath;
+                g_variant_get(dhcp4Property, "o", &dhcp4ConfigPath);
+
+                g_variant_unref(dhcp4Property);
+
+                std::string dhcp4ConfigPathStr(dhcp4ConfigPath);
+                g_free(dhcp4ConfigPath);
+
+                gchar *ip4ConfigPath;
+                g_variant_get(ip4Property, "o", &ip4ConfigPath);
+
+                g_variant_unref(ip4Property);
+
+                std::string ip4ConfigPathStr(ip4ConfigPath);
+                g_free(ip4ConfigPath);
+                GDBusProxy* ipv4Proxy = m_dbus.getNetworkManagerIpv4Proxy(ip4ConfigPathStr.c_str());
+                // Get the 'Addresses' property
+                GVariant *addressesProperty = g_dbus_proxy_get_cached_property(ipv4Proxy, "Addresses");
+                if (addressesProperty == nullptr) {
+                    NMLOG_ERROR("Failed to get Addresses property");
+                    g_object_unref(ipv4Proxy);
+                    return false;
+                }
+
+                // Get the 'Gateway' property
+                GVariant *gatewayProperty = g_dbus_proxy_get_cached_property(ipv4Proxy, "Gateway");
+                if (gatewayProperty == nullptr) {
+                    NMLOG_ERROR("Failed to get Gateway property");
+                    g_variant_unref(addressesProperty);
+                    g_object_unref(ipv4Proxy);
+                    return false;
+                }
+
+                std::string addressStr;
+                guint32 prefix;
+                gsize numAddresses = g_variant_n_children(addressesProperty);
+                for (gsize i = 0; i < numAddresses; ++i) {
+                    GVariant *addressArray = g_variant_get_child_value(addressesProperty, i);
+                    GVariantIter iter;
+                    guint32 addr;
+
+                    g_variant_iter_init(&iter, addressArray);
+
+                    if (g_variant_iter_next(&iter, "u", &addr)) {
+                        addressStr = GnomeUtils::ipToString(addr);
+                        NMLOG_DEBUG("IP Address: %s", addressStr.c_str());
+                    }
+                    if (g_variant_iter_next(&iter, "u", &prefix)) {
+                        NMLOG_DEBUG("Prefix: %d", prefix);
+                    }
+
+                    g_variant_unref(addressArray);
+                }
+
+                g_variant_unref(addressesProperty);
+
+                // Fetch and print the Gateway IP
+                const gchar *gatewayIp = g_variant_get_string(gatewayProperty, nullptr);
+                NMLOG_DEBUG("Gateway: %s", gatewayIp);
+                result.gateway = gatewayIp;
+
+                g_variant_unref(gatewayProperty);
+                g_object_unref(ipv4Proxy);
+                GDBusProxy* dhcpv4Proxy = m_dbus.getNetworkManagerDhcpv4Proxy(dhcp4ConfigPathStr.c_str());
+
+                // Get the 'Options' property
+                GVariant *optionsProperty = g_dbus_proxy_get_cached_property(dhcpv4Proxy, "Options");
+
+                if (optionsProperty == nullptr) {
+                    NMLOG_ERROR("Failed to get Options property");
+                    g_object_unref(dhcpv4Proxy);
+                    return false;
+                }
+
+                GVariantIter *iter;
+                gchar *key;
+                GVariant *value;
+                gchar *dhcpServerIp = nullptr;
+                gchar *dnsAddresses = nullptr;
+
+                // Print the whole options property for debugging
+                gchar *optionsStr = g_variant_print(optionsProperty, TRUE);
+                NMLOG_DEBUG("Options property: %s", optionsStr);
+                g_free(optionsStr);
+
+                g_variant_get(optionsProperty, "a{sv}", &iter);
+
+                while (g_variant_iter_next(iter, "{&sv}", &key, &value)) {
+                    if (g_strcmp0(key, "dhcp_server_identifier") == 0) {
+                        dhcpServerIp = g_strdup(g_variant_get_string(value, nullptr));
+                    } else if (g_strcmp0(key, "domain_name_servers") == 0) {
+                        dnsAddresses = g_strdup(g_variant_get_string(value, nullptr));
+                    }
+                    g_variant_unref(value);
+
+                    if (dhcpServerIp && dnsAddresses) {
+                        break;
+                    }
+                }
+
+                g_variant_iter_free(iter);
+                g_variant_unref(optionsProperty);
+                g_object_unref(dhcpv4Proxy);
+
+                if (dhcpServerIp) {
+                    NMLOG_DEBUG("DHCP server IP address: %s", dhcpServerIp);
+                    result.dhcpserver = dhcpServerIp;
+                    g_free(dhcpServerIp);
+                } else {
+                    NMLOG_DEBUG("Failed to find DHCP server IP address");
+                }
+                gchar **dnsList = NULL;
+                if (dnsAddresses) {
+                    // DNS addresses are space-separated, we need to split them
+                    dnsList = g_strsplit(dnsAddresses, " ", -1);
+                    if (dnsList[0] != nullptr) {
+                        NMLOG_DEBUG("Primary DNS: %s", dnsList[0]);
+                        result.primarydns = std::string(dnsList[0]);
+                        if (dnsList[1] != nullptr) {
+                            NMLOG_DEBUG("Secondary DNS: %s", dnsList[1]);
+                            result.secondarydns = std::string(dnsList[1]);
+                        } else {
+                            NMLOG_DEBUG("Secondary DNS: Not available");
+                        }
+                    } else {
+                        NMLOG_DEBUG("Failed to parse DNS addresses");
+                    }
+                    g_strfreev(dnsList);
+                    g_free(dnsAddresses);
+                } else {
+                    NMLOG_DEBUG("Failed to find DNS addresses");
+                }
+                result.ipversion = ipversion;
+                result.autoconfig = true;
+                result.ipaddress = addressStr;
+                result.prefix = prefix;
+                result.ula = "";
+            }
+            else if (g_strcmp0(ipversion.c_str(), "IPv6") == 0)
+            {
+                GVariant *ip6Property = g_dbus_proxy_get_cached_property(deviceProxy, "Ip6Config");
+                if (ip6Property == NULL) {
+                    NMLOG_ERROR("Failed to get Ip6Config property");
+                    g_object_unref(deviceProxy);
+                    return false;
+                }
+
+                GVariant *dhcp6Property = g_dbus_proxy_get_cached_property(deviceProxy, "Dhcp6Config");
+                if (dhcp6Property == NULL) {
+                    NMLOG_ERROR("Failed to get Dhcp6Config property");
+                    g_object_unref(deviceProxy);
+                    return false;
+                }
+
+                gchar *dhcp6ConfigPath;
+                g_variant_get(dhcp6Property, "o", &dhcp6ConfigPath);
+
+                g_variant_unref(dhcp6Property);
+
+                std::string dhcp6ConfigPathStr(dhcp6ConfigPath);
+                g_free(dhcp6ConfigPath);
+
+                gchar *ip6ConfigPath;
+                g_variant_get(ip6Property, "o", &ip6ConfigPath);
+
+                g_variant_unref(ip6Property);
+
+                std::string ip6ConfigPathStr(ip6ConfigPath);
+                g_free(ip6ConfigPath);
+                GDBusProxy* ipv6Proxy = m_dbus.getNetworkManagerIpv6Proxy(ip6ConfigPathStr.c_str());
+                // Get the 'Addresses' property
+                GVariant *addressesProperty = g_dbus_proxy_get_cached_property(ipv6Proxy, "Addresses");
+                if (addressesProperty == nullptr) {
+                    NMLOG_ERROR("Failed to get Addresses property for IPv6");
+                    g_object_unref(ipv6Proxy);
+                    return false;
+                }
+
+                gsize numAddresses = g_variant_n_children(addressesProperty);
+                for (gsize i = 0; i < numAddresses; ++i) {
+                    GVariant *addressTuple = g_variant_get_child_value(addressesProperty, i);
+                    GVariant *addressArray = g_variant_get_child_value(addressTuple, 0); // Get the first byte array (IPv6 address)
+                    GVariant *prefixVariant = g_variant_get_child_value(addressTuple, 1); // Get the prefix
+                    guint32 prefix = g_variant_get_uint32(prefixVariant);
+
+                    uint8_t ipv6Addr[16];
+                    gsize addrLen;
+                    gconstpointer addrData = g_variant_get_fixed_array(addressArray, &addrLen, 1);
+                    if (addrLen == 16) {
+                        memcpy(ipv6Addr, addrData, addrLen);
+                        std::string addressStr = GnomeUtils::ip6ToString(ipv6Addr);
+                        NMLOG_DEBUG("IPv6 Address: %s Prefix: %d", addressStr.c_str(), prefix);
+                        result.prefix = prefix;
+                    }
+
+                    g_variant_unref(addressArray);
+                    g_variant_unref(prefixVariant);
+                    g_variant_unref(addressTuple);
+                }
+
+                g_variant_unref(addressesProperty);
+
+                // Get the 'Gateway' property
+                GVariant *gatewayProperty = g_dbus_proxy_get_cached_property(ipv6Proxy, "Gateway");
+                if (gatewayProperty == nullptr) {
+                    NMLOG_ERROR("Failed to get Gateway property for IPv6");
+                    g_object_unref(ipv6Proxy);
+                    return false;
+                }
+
+                // Fetch and print the Gateway IP
+                const gchar *gatewayIp = g_variant_get_string(gatewayProperty, nullptr);
+                NMLOG_DEBUG("IPv6 Gateway: %s", gatewayIp);
+                result.gateway = gatewayIp;
+                g_variant_unref(gatewayProperty);
+                g_object_unref(ipv6Proxy);
+
+                GDBusProxy* dhcpv6Proxy = m_dbus.getNetworkManagerDhcpv6Proxy(dhcp6ConfigPathStr.c_str());
+                // Get the 'Options' property
+                GVariant *optionsProperty = g_dbus_proxy_get_cached_property(dhcpv6Proxy, "Options");
+                if (optionsProperty == nullptr) {
+                    NMLOG_ERROR("Failed to get Options property for DHCP6");
+                    g_object_unref(dhcpv6Proxy);
+                    return false;
+                }
+
+                GVariantIter *iter;
+                gchar *key;
+                GVariant *value;
+                gchar *dnsAddresses = nullptr;
+                gchar *ip6Address = nullptr;
+
+                // Print the whole options property for debugging
+                gchar *optionsStr = g_variant_print(optionsProperty, TRUE);
+                NMLOG_DEBUG("Options property: %s", optionsStr);
+                g_free(optionsStr);
+
+                g_variant_get(optionsProperty, "a{sv}", &iter);
+
+                while (g_variant_iter_next(iter, "{&sv}", &key, &value)) {
+                    gchar *valueStr = g_variant_print(value, TRUE);
+                    NMLOG_DEBUG("Key: %s Value: %s", key, valueStr);
+                    g_free(valueStr);
+
+                    if (g_strcmp0(key, "dhcp6_name_servers") == 0) {
+                        dnsAddresses = g_strdup(g_variant_get_string(value, nullptr));
+                        result.dhcpserver = dnsAddresses;
+                    } else if (g_strcmp0(key, "ip6_address") == 0) {
+                        ip6Address = g_strdup(g_variant_get_string(value, nullptr));
+                    }
+                    g_variant_unref(value);
+                }
+
+                g_variant_iter_free(iter);
+                g_variant_unref(optionsProperty);
+                g_object_unref(dhcpv6Proxy);
+
+                if (ip6Address) {
+                    NMLOG_DEBUG("IPv6 Address: %s", ip6Address);
+                    result.ipaddress = ip6Address;
+                    g_free(ip6Address);
+                } else {
+                    NMLOG_ERROR("Failed to find the IPv6 address");
+                }
+
+                if (dnsAddresses) {
+                    // DNS addresses are space-separated, we need to split them
+                    gchar **dnsList = g_strsplit(dnsAddresses, " ", -1);
+                    if (dnsList[0] != nullptr) {
+                        NMLOG_DEBUG("Primary DNS: %s", dnsList[0]);
+                        result.primarydns = std::string(dnsList[0]);
+                        if (dnsList[1] != nullptr) {
+                            NMLOG_DEBUG("Secondary DNS: %s ", dnsList[1]);
+                            result.secondarydns = std::string(dnsList[1]);
+                        } else {
+                            NMLOG_DEBUG("Secondary DNS: Not available");
+                        }
+                    } else {
+                        NMLOG_ERROR("Failed to parse DNS addresses");
+                    }
+                    g_strfreev(dnsList);
+                    g_free(dnsAddresses);
+                } else {
+                    std::cerr << "Failed to find DNS addresses" << std::endl;
+                }
+                result.ipversion = ipversion;
+            }
             return true;
         }
 

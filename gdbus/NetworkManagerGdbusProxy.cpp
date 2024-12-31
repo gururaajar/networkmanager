@@ -52,13 +52,16 @@ namespace WPEFramework
                 rc = Core::ERROR_NONE;
             else
                 NMLOG_ERROR("GetAvailableInterfaces failed");
+            using Implementation = RPC::IteratorType<Exchange::INetworkManager::IInterfaceDetailsIterator>;
+            interfacesItr = Core::Service<Implementation>::Create<Exchange::INetworkManager::IInterfaceDetailsIterator>(interfaceList);
+
             return rc;
         }
 
-        uint32_t NetworkManagerImplementation::GetPrimaryInterface ()
+        uint32_t NetworkManagerImplementation::GetPrimaryInterface (string& interface /* @out */)
         {
             uint32_t rc = Core::ERROR_GENERAL;
-            if(_nmGdbusClient->getPrimaryInterface())
+            if(_nmGdbusClient->getPrimaryInterface(interface))
                 rc = Core::ERROR_NONE;
             else
                 NMLOG_ERROR("GetPrimaryInterface failed");
@@ -86,13 +89,23 @@ namespace WPEFramework
 
         uint32_t NetworkManagerImplementation::GetInterfaceState(const string& interface/* @in */, bool& isEnabled /* @out */)
         {
-            return Core::ERROR_NONE;
+            uint32_t rc = Core::ERROR_GENERAL;
+            if(_nmGdbusClient->getInterfaceState(interface, isEnabled))
+                rc = Core::ERROR_NONE;
+            else
+                NMLOG_ERROR("GetInterfaceState failed");
+            return rc;
         }
 
        /* @brief Get IP Address Of the Interface */
         uint32_t NetworkManagerImplementation::GetIPSettings(string& interface /* @inout */, const string &ipversion /* @in */, IPAddress& result /* @out */)
         {
-            return Core::ERROR_NONE;
+            uint32_t rc = Core::ERROR_GENERAL;
+            if(_nmGdbusClient->getIPSettings(interface, ipversion, result))
+                rc = Core::ERROR_NONE;
+            else
+                NMLOG_ERROR("GetIPSettings failed");
+            return rc;
         }
 
         /* @brief Set IP Address Of the Interface */
@@ -102,7 +115,7 @@ namespace WPEFramework
             if(_nmGdbusClient->setIPSettings(interface, address))
                 rc = Core::ERROR_NONE;
             else
-                NMLOG_ERROR("SetInterfaceState failed");
+                NMLOG_ERROR("SetIPSettings failed");
             return rc;
         }
 

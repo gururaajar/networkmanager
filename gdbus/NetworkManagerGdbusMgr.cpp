@@ -259,6 +259,50 @@ namespace WPEFramework
             return proxy;
         }
 
+        GDBusProxy* DbusMgr::getNetworkManagerDhcpv4Proxy(const char* dhcpConfigPath)
+        {
+            GError* error = NULL;
+            GDBusProxy *proxy = g_dbus_proxy_new_sync(
+                    getConnection(),
+                    G_DBUS_PROXY_FLAGS_NONE,
+                    NULL,
+                    "org.freedesktop.NetworkManager",
+                    dhcpConfigPath,
+                    "org.freedesktop.NetworkManager.DHCP4Config",
+                    NULL,
+                    &error);
+
+            if (proxy == nullptr) {
+                g_dbus_error_strip_remote_error(error);
+                NMLOG_FATAL("Error creating proxy: %s", error->message);
+                g_clear_error(&error);
+                return NULL;
+            }
+            return proxy;
+        }
+
+        GDBusProxy* DbusMgr::getNetworkManagerDhcpv6Proxy(const char* dhcpConfigPath)
+        {
+            GError* error = NULL;
+            GDBusProxy *proxy = g_dbus_proxy_new_sync(
+                    getConnection(),
+                    G_DBUS_PROXY_FLAGS_NONE,
+                    NULL,
+                    "org.freedesktop.NetworkManager",
+                    dhcpConfigPath,
+                    "org.freedesktop.NetworkManager.DHCP6Config",
+                    NULL,
+                    &error);
+
+            if (proxy == nullptr) {
+                g_dbus_error_strip_remote_error(error);
+                NMLOG_FATAL("Error creating proxy: %s", error->message);
+                g_clear_error(&error);
+                return NULL;
+            }
+            return proxy;
+        }
+
         GDBusProxy* DbusMgr::getNetworkManagerPropertyProxy(const char* devicePath)
         {
             GError* error = NULL;
