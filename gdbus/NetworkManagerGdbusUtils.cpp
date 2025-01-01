@@ -719,7 +719,7 @@ namespace WPEFramework
         // Helper function to convert a raw IPv4 address to human-readable format
         std::string GnomeUtils::ipToString(uint32_t ip) {
             ip = ntohl(ip); // Convert from network to host byte order
-            char buf[INET_ADDRSTRLEN];
+            char buf[INET_ADDRSTRLEN] = {0};
             snprintf(buf, sizeof(buf), "%u.%u.%u.%u",
                     (ip >> 24) & 0xFF,
                     (ip >> 16) & 0xFF,
