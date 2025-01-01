@@ -38,7 +38,6 @@ namespace WPEFramework
                 NMLOG_FATAL("Error connecting to system D-Bus bus: %s ", error->message);
                 g_error_free(error);
             }
-            //flags = static_cast<GDBusProxyFlags>(G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES | G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START);
             flags = G_DBUS_PROXY_FLAGS_NONE;
         }
 
@@ -64,7 +63,6 @@ namespace WPEFramework
                 return NULL;
             }
 
-            //flags = static_cast<GDBusProxyFlags>(G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES | G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START);
             flags = G_DBUS_PROXY_FLAGS_NONE;
             return connection;
         }
@@ -264,7 +262,7 @@ namespace WPEFramework
             GError* error = NULL;
             GDBusProxy *proxy = g_dbus_proxy_new_sync(
                     getConnection(),
-                    G_DBUS_PROXY_FLAGS_NONE,
+                    flags,
                     NULL,
                     "org.freedesktop.NetworkManager",
                     dhcpConfigPath,
@@ -286,7 +284,7 @@ namespace WPEFramework
             GError* error = NULL;
             GDBusProxy *proxy = g_dbus_proxy_new_sync(
                     getConnection(),
-                    G_DBUS_PROXY_FLAGS_NONE,
+                    flags,
                     NULL,
                     "org.freedesktop.NetworkManager",
                     dhcpConfigPath,
@@ -308,7 +306,7 @@ namespace WPEFramework
             GError* error = NULL;
             GDBusProxy* proxy = g_dbus_proxy_new_sync(
                     getConnection(),
-                    G_DBUS_PROXY_FLAGS_NONE,
+                    flags,
                     nullptr,
                     "org.freedesktop.NetworkManager",
                     devicePath,

@@ -224,16 +224,6 @@ namespace WPEFramework
             } else {
                 NMLOG_DEBUG("Successfully updated IPv4 settings for %s interface", interface);
             }
-            //if(!GnomeUtils::deactivateActiveConnection(m_dbus, devInfo.path))
-#if 0
-            if(!GnomeUtils::deactivateActiveConnection(m_dbus, activeConnectionPath))
-            {
-                NMLOG_INFO("deactivateConnection not successfull");
-                return false;
-            }
-            else
-                NMLOG_INFO("deactivateConnection successfull");
-#endif
             if(!GnomeUtils::activateConnection(m_dbus, connectionProfile, devInfo.path))
             {
                 NMLOG_INFO("activateConnection not successful");
@@ -285,8 +275,6 @@ namespace WPEFramework
             const gchar *settingsKey;
             const gchar *existingId = NULL;
             const gchar *existingType = NULL;
-            /*const gchar *existingIPv4Method = NULL;
-            const gchar *existingIPv6Method = NULL;*/
             const gchar *existingInterfaceName = NULL;
 
             const gchar *existingKeyMgmt = NULL;
@@ -311,17 +299,6 @@ namespace WPEFramework
                     } else if (g_strcmp0(key, "interface-name") == 0) {
                         existingInterfaceName = g_variant_get_string(value, NULL);
                         NMLOG_DEBUG("Interface Name: %s\n", existingInterfaceName);
-/*                    } else if (g_strcmp0(key, "method") == 0) {
-                        if(g_strcmp0(settingsKey, "ipv4") == 0)
-                        {
-                            existingIPv4Method = g_variant_get_string(value, NULL);
-                            NMLOG_DEBUG("IPV4 Method: %s\n", existingIPv4Method);
-                        }
-                        else if(g_strcmp0(settingsKey, "ipv6") == 0)
-                        {
-                            existingIPv6Method = g_variant_get_string(value, NULL);
-                            NMLOG_DEBUG("IPV6 Method: %s\n", existingIPv6Method);
-                        }*/
                     } else if (g_strcmp0(key, "ssid") == 0) {
                         gsize size;
                         const guint8 *ssid = (const guint8 *) g_variant_get_fixed_array(value, &size, sizeof(guint8));
@@ -346,14 +323,11 @@ namespace WPEFramework
             g_variant_builder_init(&settingsBuilder, G_VARIANT_TYPE("a{sa{sv}}"));
             // Define the 'connection' dictionary with connection details
             g_variant_builder_init(&connectionBuilder, G_VARIANT_TYPE("a{sv}"));
-#if 1
             g_variant_builder_add(&connectionBuilder, "{sv}", "id", g_variant_new_string(existingId));
             g_variant_builder_add(&connectionBuilder, "{sv}", "type", g_variant_new_string(existingType));
             g_variant_builder_add(&connectionBuilder, "{sv}", "interface-name", g_variant_new_string(existingInterfaceName));
-#endif
             g_variant_builder_add(&settingsBuilder, "{sa{sv}}", "connection", &connectionBuilder);
 
-#if 1
             if (g_strcmp0(interface.c_str(), GnomeUtils::getWifiIfname()) == 0) {
                 // Define the '802-11-wireless' dictionary with Wi-Fi specific details
                 g_variant_builder_init(&wifiBuilder, G_VARIANT_TYPE("a{sv}"));
@@ -373,13 +347,9 @@ namespace WPEFramework
                 g_variant_builder_add(&wifiSecurityBuilder, "{sv}", "key-mgmt", g_variant_new_string(existingKeyMgmt)); // Key management
                 g_variant_builder_add(&settingsBuilder, "{sa{sv}}", "802-11-wireless-security", &wifiSecurityBuilder);
             }
-#endif
-
 
             GVariantBuilder ipv4Builder;
             g_variant_builder_init(&ipv4Builder, G_VARIANT_TYPE("a{sv}"));
-            /*GVariantBuilder ipv6Builder;
-            g_variant_builder_init(&ipv6Builder, G_VARIANT_TYPE("a{sv}"));*/
 
             if (g_strcmp0(address.ipversion.c_str(), "IPv4") == 0)
             {
@@ -400,7 +370,6 @@ namespace WPEFramework
                 GVariantBuilder addressEntryBuilder;
                 g_variant_builder_init(&addressEntryBuilder, G_VARIANT_TYPE("au"));
 
-                g_print("------------ip_address: %s\n", address.ipaddress.c_str());
                 g_variant_builder_add(&addressEntryBuilder, "u", GnomeUtils::ip4_str_to_nbo(address.ipaddress));
 
                 g_variant_builder_add(&addressEntryBuilder, "u", address.prefix);
@@ -420,16 +389,7 @@ namespace WPEFramework
                 g_variant_builder_add(&ipv4Builder, "{sv}", "gateway", g_variant_new_string(address.gateway.c_str()));
             }
 
-            /*else
-            {
-                g_variant_builder_add(&ipv4Builder, "{sv}", "method", g_variant_new_string(existingIPv4Method));
-                g_variant_builder_add(&ipv6Builder, "{sv}", "method", g_variant_new_string(existingIPv6Method));
-            }
-            g_variant_builder_add(&ipv4Builder, "{sv}", "route-metric", g_variant_new_int64(route_metric));
-            g_variant_builder_add(&ipv6Builder, "{sv}", "route-metric", g_variant_new_int64(route_metric));*/
-
             g_variant_builder_add(&settingsBuilder, "{sa{sv}}", "ipv4", &ipv4Builder);
-            //g_variant_builder_add(&settingsBuilder, "{sa{sv}}", "ipv6", &ipv6Builder);
 
             g_dbus_proxy_call_sync(
                     settingsProxy,
@@ -446,16 +406,6 @@ namespace WPEFramework
             } else {
                 NMLOG_DEBUG("Successfully updated IPv4 settings for %s interface", interface.c_str());
             }
-            //if(!GnomeUtils::deactivateActiveConnection(m_dbus, devInfo.path))
-#if 0
-            if(!GnomeUtils::deactivateActiveConnection(m_dbus, activeConnectionPath))
-            {
-                NMLOG_INFO("deactivateConnection not successfull");
-                return false;
-            }
-            else
-                NMLOG_INFO("deactivateConnection successfull");
-#endif
             if(!GnomeUtils::activateConnection(m_dbus, connectionProfile, devInfo.path))
             {
                 NMLOG_INFO("activateConnection not successful");
@@ -489,7 +439,6 @@ namespace WPEFramework
             gchar *activeConnectionPath = nullptr;
             gint64 routeMetric;
             while (g_variant_iter_loop(&iter, "o", &activeConnectionPath)) {
-                NMLOG_INFO("---- activeConnectionPath = %s ------", activeConnectionPath);
                 GDBusProxy *activeConnectionProxy = m_dbus.getNetworkManagerActiveConnProxy(activeConnectionPath);
 
                 if (activeConnectionProxy == nullptr) {
@@ -768,7 +717,6 @@ namespace WPEFramework
             gchar *activeConnectionPath = nullptr;
             bool found = false;
             while (g_variant_iter_loop(&iter, "o", &activeConnectionPath)) {
-                NMLOG_INFO("---- activeConnectionPath = %s ------", activeConnectionPath);
                 GDBusProxy *activeConnectionProxy = m_dbus.getNetworkManagerActiveConnProxy(activeConnectionPath);
 
                 if (activeConnectionProxy == nullptr) {

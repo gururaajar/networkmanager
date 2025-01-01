@@ -573,93 +573,6 @@ namespace WPEFramework
             return true;
         }
 
-#if 0
-        bool GnomeUtils::getConnectionPath(DbusMgr& m_dbus, const std::string interfaceName, std::string& connectionPath){
-            std::string device_path;
-
-            GError* error = nullptr;
-            GVariant* result = g_dbus_proxy_call_sync(
-                    nm_proxy,
-                    "GetDevices",
-                    nullptr,
-                    G_DBUS_CALL_FLAGS_NONE,
-                    -1,
-                    nullptr,
-                    &error
-                    );
-
-            if (error) {
-                std::cerr << "GetDevices Error: " << error->message << std::endl;
-                g_error_free(error);
-                return device_path;
-            }
-
-            if (result != nullptr) {
-                GVariantIter* iter;
-                g_variant_get(result, "(ao)", &iter);
-                const gchar* device_path_str;
-                while (g_variant_iter_next(iter, "o", &device_path_str)) {
-                    std::string current_device_path = device_path_str;
-
-                    GDBusProxy* device_proxy = g_dbus_proxy_new_sync(
-                            g_dbus_proxy_get_connection(nm_proxy),
-                            G_DBUS_PROXY_FLAGS_NONE,
-                            nullptr,
-                            "org.freedesktop.NetworkManager",
-                            current_device_path.c_str(),
-                            "org.freedesktop.DBus.Properties",
-                            nullptr,
-                            &error
-                            );
-
-                    if (error) {
-                        std::cerr << "g_dbus_proxy_new_sync Error: " << error->message << std::endl;
-                        g_error_free(error);
-                        continue;
-                    }
-
-                    GVariant* result_interface = g_dbus_proxy_call_sync(
-                            device_proxy,
-                            "Get",
-                            g_variant_new("(ss)", "org.freedesktop.NetworkManager.Device", "Interface"),
-                            G_DBUS_CALL_FLAGS_NONE,
-                            -1,
-                            nullptr,
-                            &error
-                            );
-
-                    if (error) {
-                        std::cerr << "Get Interface Error: " << error->message << std::endl;
-                        g_error_free(error);
-                        g_object_unref(device_proxy);
-                        continue;
-                    }
-
-                    if (result_interface != nullptr) {
-                        GVariant* value;
-                        g_variant_get(result_interface, "(v)", &value);
-                        const gchar* result_interface_name = g_variant_get_string(value, nullptr);
-                        if (interfaceName == result_interface_name) {
-                            device_path = current_device_path;
-                            g_variant_unref(value);
-                            g_variant_unref(result_interface);
-                            g_object_unref(device_proxy);
-                            break;
-                        }
-                        g_variant_unref(value);
-                        g_variant_unref(result_interface);
-                    }
-                    g_object_unref(device_proxy);
-                }
-
-                g_variant_iter_free(iter);
-                g_variant_unref(result);
-            }
-
-            return device_path;
-        }
-#endif
-
         bool GnomeUtils::getConnectionProfile(DbusMgr& m_dbus, const std::string interfaceName, std::string& connectionProfile)
         {
             std::list<std::string> paths;
@@ -679,27 +592,12 @@ namespace WPEFramework
                         nullptr,
                         &error
                         );
-                /*GVariant* connectionSettings = g_dbus_connection_call_sync(
-                        m_dbus.getConnection(),
-                        "org.freedesktop.NetworkManager",
-                        path.c_str(),
-                        "org.freedesktop.NetworkManager.Settings.Connection",
-                        "GetSettings",
-                        nullptr,
-                        G_VARIANT_TYPE("(a{sa{sv}})"),
-                        G_DBUS_CALL_FLAGS_NONE,
-                        -1,
-                        nullptr,
-                        &error
-                        );*/
                 if (error) {
                     NMLOG_ERROR("GetSettings Error = %s", error->message);
                     g_error_free(error);
                     continue;
                 }
                 if (connectionSettings) {
-                    //print_gvariant_type(connectionSettings); // Print type and content of connectionSettings
-                    // Extract the 'connection' dictionary from the GVariant
                     GVariant *connections = g_variant_get_child_value(connectionSettings, 0);
                     GVariant *connection = g_variant_lookup_value(connections, "connection", G_VARIANT_TYPE_VARDICT);
 
@@ -714,7 +612,7 @@ namespace WPEFramework
                     const gchar *id;
                     g_variant_lookup(connection, "interface-name", "&s", &id);
 
-                    NMLOG_INFO("----Interface Name: %s", id);
+                    NMLOG_DEBUG("Interface Name: %s", id);
 
                     if (interfaceName == id) {
                         connectionProfile = path;
@@ -722,49 +620,17 @@ namespace WPEFramework
 
                     g_variant_unref(connection);
                     g_variant_unref(connections);
-
-                    /*GVariantIter* settings_iter;
-                    g_variant_get(connectionSettings, "(a{sa{sv}})", &settings_iter);
-                    g_variant_unref(connectionSettings);*/
                 }
             }
             return true;
         }
-
-#if 0
-        bool GnomeUtils::deactivateActiveConnection(DbusMgr& m_dbus, const std::string& devicePath) {
-            GError* error = nullptr;
-            GDBusProxy* deviceProxy  = m_dbus.getNetworkManagerDeviceProxy(devicePath.c_str());
-           
-            GVariant* empty_settings = g_variant_new("a{sa{sv}}", nullptr);
-            guint64 timestamp = 0;  // Pass a valid timestamp in microseconds if necessary
-            guint flags = 0;  // Currently no flags are defined, set to 0 
-            if(deviceProxy == NULL)
-                return false;
-
-            GVariant* result = g_dbus_proxy_call_sync(
-                    deviceProxy,
-                    "Reapply",
-                    g_variant_new("(@a{sa{sv}}tu)", empty_settings, timestamp, flags),
-                    G_DBUS_CALL_FLAGS_NONE,
-                    -1,
-                    nullptr,
-                    &error
-                    );
-            if (error) {
-                NMLOG_ERROR("DeactivateConnection Error: %s", error->message);
-                g_error_free(error);
-            } else if (result != nullptr) {
-                g_variant_unref(result);
-            }
-#endif
 
         bool GnomeUtils::deactivateActiveConnection(DbusMgr& m_dbus, const std::string& connectionPath) {
             GError* error = nullptr;
             GDBusProxy* nmProxy  = m_dbus.getNetworkManagerProxy();
             if(nmProxy == NULL)
                 return false;
-            NMLOG_INFO(" -- deactivateActiveConnection %s --", connectionPath.c_str());
+            NMLOG_DEBUG("deactivateActiveConnection %s", connectionPath.c_str());
             GVariant* result = g_dbus_proxy_call_sync(
                     nmProxy,
                     "DeactivateConnection",
@@ -782,117 +648,6 @@ namespace WPEFramework
             }
             return true;
         }
-
-#if 0
-        // Function to deactivate any active connection
-        bool GnomeUtils::deactivateActiveConnection(DbusMgr& m_dbus, const std::string& devicePath) {
-            GError* error = nullptr;
-            GDBusProxy* nmProxy  = m_dbus.getNetworkManagerProxy();
-            if(nmProxy == NULL)
-                return false;
-
-            /*GVariant* activeConnectionResult = g_dbus_proxy_get_cached_property(nmProxy, "ActiveConnections");
-            GVariant* activeConnectionResult = g_dbus_proxy_call_sync(
-                    nmProxy,
-                    "Get",
-                    g_variant_new("(ss)", "org.freedesktop.NetworkManager", "ActiveConnections"),
-                    G_DBUS_CALL_FLAGS_NONE,
-                    -1,
-                    nullptr,
-                    &error
-                    );
-
-            if (error) {
-                NMLOG_ERROR("Get ActiveConnections Error: %s", error->message);
-                g_error_free(error);
-                return false;
-            }*/
-
-            /*GDBusProxy* device_proxy = g_dbus_proxy_new_sync(
-                    g_dbus_proxy_get_connection(nmProxy),
-                    G_DBUS_PROXY_FLAGS_NONE,
-                    nullptr,
-                    "org.freedesktop.NetworkManager",
-                    "/org/freedesktop/NetworkManager",
-                    "org.freedesktop.DBus.Properties",
-                    nullptr,
-                    &error
-                    );*/
-
-    GDBusProxy* proxy = g_dbus_proxy_new_sync(
-        g_dbus_proxy_get_connection(nmProxy),
-        G_DBUS_PROXY_FLAGS_NONE,
-        nullptr,
-        "org.freedesktop.NetworkManager",
-        "/org/freedesktop/NetworkManager",
-        "org.freedesktop.DBus.Properties",
-        nullptr,
-        &error
-    );
-
-            GVariant* activeConnectionResult = g_dbus_proxy_call_sync(
-                    proxy,
-                    "Get",                                                                                                                                                      g_variant_new("(ss)", "org.freedesktop.NetworkManager", "ActiveConnections"),                                                           
-                    G_DBUS_CALL_FLAGS_NONE,                                                                                                                 
-                    -1,                                                                                                                                     
-                    nullptr,                                                                                                                                
-                    &error                                                                                                                                                      );
-            /*GVariant* activeConnectionResult = g_dbus_connection_call_sync(
-                    m_dbus.getConnection(),
-                    "org.freedesktop.NetworkManager",
-                    "/org/freedesktop/NetworkManager",
-                    "org.freedesktop.DBus.Properties",
-                    "Get",
-                    g_variant_new("(ss)", "org.freedesktop.NetworkManager", "ActiveConnections"),
-                    G_VARIANT_TYPE("(v)"),
-                    G_DBUS_CALL_FLAGS_NONE,
-                    -1,
-                    nullptr,
-                    &error
-                    );*/
-
-            if (error) {
-                NMLOG_ERROR("Get ActiveConnections Error: %s", error->message);
-                g_error_free(error);
-                return false;
-            }
-
-            if (activeConnectionResult != nullptr) {
-                GVariant* value;
-                g_variant_get(activeConnectionResult, "(v)", &value);
-                if (g_variant_is_of_type(value, G_VARIANT_TYPE_ARRAY)) {
-                    GVariantIter iter;
-                    g_variant_iter_init(&iter, value);
-                    const gchar* activeConnectionPath;
-                    while (g_variant_iter_next(&iter, "o", &activeConnectionPath)) {
-                        // Deactivate each active connection
-                        GError* deactivationError = nullptr;
-                        GVariant* deactivationResult = g_dbus_proxy_call_sync(
-                                nmProxy,
-                                "DeactivateConnection",
-                                g_variant_new("(o)", activeConnectionPath),
-                                G_DBUS_CALL_FLAGS_NONE,
-                                -1,
-                                nullptr,
-                                &deactivationError
-                                );
-
-                        if (deactivationError) {
-                            NMLOG_ERROR("DeactivateConnection Error: %s", deactivationError->message);
-                            g_error_free(deactivationError);
-                        } else if (deactivationResult != nullptr) {
-                            g_variant_unref(deactivationResult);
-                        }
-                    }
-                } else {
-                    NMLOG_ERROR("ActiveConnections is not an object path array");
-                }
-                g_variant_unref(value);
-                g_variant_unref(activeConnectionResult);
-            }
-            return true;
-        }
-#endif
 
         bool GnomeUtils::activateConnection(DbusMgr& m_dbus, const std::string& connectionProfile, const std::string& devicePath)
         {
@@ -979,8 +734,6 @@ namespace WPEFramework
             inet_ntop(AF_INET6, ipv6, buf, sizeof(buf));
             return std::string(buf);
         }
-
-
     } // Plugin
 } // WPEFramework
 
