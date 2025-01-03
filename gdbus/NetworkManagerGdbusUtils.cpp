@@ -237,7 +237,7 @@ namespace WPEFramework
         {
             GVariant *devicesVar = NULL;
             GDBusProxy* nmProxy = NULL;
-            u_int32_t value;
+            u_int32_t value = 0;
             bool managedValue;
 
             nmProxy = m_dbus.getNetworkManagerDeviceProxy(devicePath);
@@ -573,82 +573,6 @@ namespace WPEFramework
             return true;
         }
 
-        bool GnomeUtils::getConnectionProfile(DbusMgr& m_dbus, const std::string interfaceName, std::string& connectionProfile)
-        {
-            std::list<std::string> paths;
-            GError* error = nullptr;
-            if(!GnomeUtils::getConnectionPaths(m_dbus, paths))
-            {
-                NMLOG_ERROR("Connection path fetch failed");
-                return false;
-            }
-            for (const std::string& path : paths) {
-                GVariant* connectionSettings = g_dbus_proxy_call_sync(
-                        m_dbus.getNetworkManagerSettingsConnectionProxy(path.c_str()),
-                        "GetSettings",
-                        nullptr,
-                        G_DBUS_CALL_FLAGS_NONE,
-                        -1,
-                        nullptr,
-                        &error
-                        );
-                if (error) {
-                    NMLOG_ERROR("GetSettings Error = %s", error->message);
-                    g_error_free(error);
-                    continue;
-                }
-                if (connectionSettings) {
-                    GVariant *connections = g_variant_get_child_value(connectionSettings, 0);
-                    GVariant *connection = g_variant_lookup_value(connections, "connection", G_VARIANT_TYPE_VARDICT);
-
-                    if (connection == NULL) {
-                        NMLOG_ERROR("Error extracting 'connection' dictionary");
-                        g_variant_unref(connectionSettings);
-                        return false;
-                    }
-
-                    // Fetch the 'interface-name' from the 'connection' dictionary
-
-                    const gchar *id;
-                    g_variant_lookup(connection, "interface-name", "&s", &id);
-
-                    NMLOG_DEBUG("Interface Name: %s", id);
-
-                    if (interfaceName == id) {
-                        connectionProfile = path;
-                    }
-
-                    g_variant_unref(connection);
-                    g_variant_unref(connections);
-                }
-            }
-            return true;
-        }
-
-        bool GnomeUtils::deactivateActiveConnection(DbusMgr& m_dbus, const std::string& connectionPath) {
-            GError* error = nullptr;
-            GDBusProxy* nmProxy  = m_dbus.getNetworkManagerProxy();
-            if(nmProxy == NULL)
-                return false;
-            NMLOG_DEBUG("deactivateActiveConnection %s", connectionPath.c_str());
-            GVariant* result = g_dbus_proxy_call_sync(
-                    nmProxy,
-                    "DeactivateConnection",
-                    g_variant_new("(o)", connectionPath.c_str()),
-                    G_DBUS_CALL_FLAGS_NONE,
-                    -1,
-                    nullptr,
-                    &error
-                    );
-            if (error) {
-                NMLOG_ERROR("DeactivateConnection Error: %s", error->message);
-                g_error_free(error);
-            } else if (result != nullptr) {
-                g_variant_unref(result);
-            }
-            return true;
-        }
-
         bool GnomeUtils::activateConnection(DbusMgr& m_dbus, const std::string& connectionProfile, const std::string& devicePath)
         {
             GError* error = nullptr;
@@ -703,6 +627,88 @@ namespace WPEFramework
                 }
             }
             g_object_unref(deviceProxy);
+            return true;
+        }
+
+        bool GnomeUtils::getSettingsConnectionPath(DbusMgr &m_dbus, std::string& connectionPath, const std::string& interface)
+        {
+            GError *error = nullptr;
+            GDBusProxy *nmProxy = NULL;
+            bool found = false;
+            nmProxy = m_dbus.getNetworkManagerProxy();
+            if(nmProxy == NULL)
+                return false;
+            GVariant *activeConnections = g_dbus_proxy_get_cached_property(nmProxy, "ActiveConnections");
+            if (activeConnections == nullptr) {
+                NMLOG_ERROR("Error retrieving active connections");
+                g_object_unref(nmProxy);
+                return false;
+            }
+
+            GVariantIter iter;
+            g_variant_iter_init(&iter, activeConnections);
+            gchar *activeConnectionPath = nullptr;
+            while (g_variant_iter_loop(&iter, "o", &activeConnectionPath)) {
+                GDBusProxy *activeConnectionProxy = m_dbus.getNetworkManagerActiveConnProxy(activeConnectionPath);
+
+                if (activeConnectionProxy == nullptr) {
+                    NMLOG_ERROR("Error creating active connection proxy: %s", error->message);
+                    g_error_free(error);
+                    continue;
+                }
+
+                GVariant *devicesVar = g_dbus_proxy_get_cached_property(activeConnectionProxy, "Devices");
+                if (devicesVar == nullptr) {
+                    NMLOG_ERROR("Error retrieving devices property");
+                    g_object_unref(activeConnectionProxy);
+                    continue;
+                }
+
+                GVariantIter devicesIter;
+                g_variant_iter_init(&devicesIter, devicesVar);
+                gchar *devicePath = nullptr;
+
+                while (g_variant_iter_loop(&devicesIter, "o", &devicePath)) {
+                    GDBusProxy *deviceProxy = m_dbus.getNetworkManagerDeviceProxy(devicePath);
+
+                    if (deviceProxy == nullptr) {
+                        NMLOG_ERROR("Error creating device proxy: %s", error->message);
+                        g_error_free(error);
+                        continue;
+                    }
+
+                    GVariant *ifaceProperty = g_dbus_proxy_get_cached_property(deviceProxy, "Interface");
+                    if (ifaceProperty) {
+                        const gchar *iface = g_variant_get_string(ifaceProperty, nullptr);
+                        if (interface == iface) {
+                            found = true;
+                            GVariant *connectionProperty = g_dbus_proxy_get_cached_property(activeConnectionProxy, "Connection");
+                            if (connectionProperty) {
+                                connectionPath = g_variant_get_string(connectionProperty, nullptr);
+                                g_variant_unref(connectionProperty);
+                            } else {
+                                NMLOG_ERROR("Error retrieving connection property");
+                            }
+
+                            g_variant_unref(ifaceProperty);
+                            g_object_unref(deviceProxy);
+                            break;
+                        }
+                        g_variant_unref(ifaceProperty);
+                    }
+
+                    g_object_unref(deviceProxy);
+                }
+                g_variant_unref(devicesVar);
+                g_object_unref(activeConnectionProxy);
+
+                if (found) {
+                    break;
+                }
+            }
+
+            g_variant_unref(activeConnections);
+            g_object_unref(nmProxy);
             return true;
         }
 

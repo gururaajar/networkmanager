@@ -78,9 +78,8 @@ namespace WPEFramework
                 static bool getIPv4AddrFromIPv4ConfigProxy(GDBusProxy *ipProxy, std::string& ipAddr, uint32_t& prifix);
                 static bool getIPv6AddrFromIPv6ConfigProxy(GDBusProxy *ipProxy, std::string& ipAddr, uint32_t& prifix);
                 static bool activateConnection(DbusMgr& m_dbus, const std::string& connectionProfile, const std::string& devicePath);
-                static bool deactivateActiveConnection(DbusMgr& m_dbus, const std::string& devicePath);
-                static bool getConnectionProfile(DbusMgr& m_dbus, const std::string interfaceName, std::string& connectionProfile);
                 static bool updateInterfaceState(DbusMgr& m_dbus, const std::string& devicePath, bool enable);
+                static bool getSettingsConnectionPath(DbusMgr &m_dbus, std::string& connectionPath, const std::string& interface);
                 static uint32_t ip4_str_to_nbo(const std::string &ipAddress);
                 static std::string ipToString(uint32_t ip);
                 static std::string ip6ToString(const uint8_t *ipv6);

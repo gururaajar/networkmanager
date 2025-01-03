@@ -70,11 +70,8 @@ namespace WPEFramework
         bool updateRouteMetric(DbusMgr& m_dbus, const std::string& connectionPath, gint64 route_metric, const gchar* interface, const std::string& activeConnectionPath)
         {
             GError *error = nullptr;
-            std::string connectionProfile;
             deviceInfo devInfo{};
             if(!GnomeUtils::getDeviceInfoByIfname(m_dbus, interface, devInfo))
-                return false;
-            if(!GnomeUtils::getConnectionProfile(m_dbus, interface, connectionProfile))
                 return false;
             GDBusProxy *settingsProxy = m_dbus.getNetworkManagerSettingsConnectionProxy(connectionPath.c_str());
 
@@ -166,14 +163,11 @@ namespace WPEFramework
             g_variant_builder_init(&settingsBuilder, G_VARIANT_TYPE("a{sa{sv}}"));
             // Define the 'connection' dictionary with connection details
             g_variant_builder_init(&connectionBuilder, G_VARIANT_TYPE("a{sv}"));
-#if 1
             g_variant_builder_add(&connectionBuilder, "{sv}", "id", g_variant_new_string(existingId));
             g_variant_builder_add(&connectionBuilder, "{sv}", "type", g_variant_new_string(existingType));
             g_variant_builder_add(&connectionBuilder, "{sv}", "interface-name", g_variant_new_string(existingInterfaceName));
-#endif
             g_variant_builder_add(&settingsBuilder, "{sa{sv}}", "connection", &connectionBuilder);
 
-#if 1
             if (g_strcmp0(interface, GnomeUtils::getWifiIfname()) == 0) {
                 // Define the '802-11-wireless' dictionary with Wi-Fi specific details
                 g_variant_builder_init(&wifiBuilder, G_VARIANT_TYPE("a{sv}"));
@@ -193,7 +187,6 @@ namespace WPEFramework
                 g_variant_builder_add(&wifiSecurityBuilder, "{sv}", "key-mgmt", g_variant_new_string(existingKeyMgmt)); // Key management
                 g_variant_builder_add(&settingsBuilder, "{sa{sv}}", "802-11-wireless-security", &wifiSecurityBuilder);
             }
-#endif
 
 
             GVariantBuilder ipv4Builder;
@@ -224,7 +217,7 @@ namespace WPEFramework
             } else {
                 NMLOG_DEBUG("Successfully updated IPv4 settings for %s interface", interface);
             }
-            if(!GnomeUtils::activateConnection(m_dbus, connectionProfile, devInfo.path))
+            if(!GnomeUtils::activateConnection(m_dbus, connectionPath, devInfo.path))
             {
                 NMLOG_INFO("activateConnection not successful");
                 return false;
@@ -240,11 +233,8 @@ namespace WPEFramework
         bool updateIPSettings(DbusMgr& m_dbus, const std::string& connectionPath, const Exchange::INetworkManager::IPAddress& address, const std::string& interface)
         {
             GError *error = nullptr;
-            std::string connectionProfile;
             deviceInfo devInfo{};
             if(!GnomeUtils::getDeviceInfoByIfname(m_dbus, interface.c_str(), devInfo))
-                return false;
-            if(!GnomeUtils::getConnectionProfile(m_dbus, interface, connectionProfile))
                 return false;
             GDBusProxy *settingsProxy = m_dbus.getNetworkManagerSettingsConnectionProxy(connectionPath.c_str());
 
@@ -407,7 +397,7 @@ namespace WPEFramework
             } else {
                 NMLOG_DEBUG("Successfully updated IPv4 settings for %s interface", interface.c_str());
             }
-            if(!GnomeUtils::activateConnection(m_dbus, connectionProfile, devInfo.path))
+            if(!GnomeUtils::activateConnection(m_dbus, connectionPath, devInfo.path))
             {
                 NMLOG_INFO("activateConnection not successful");
                 return false;
@@ -504,7 +494,6 @@ namespace WPEFramework
             g_variant_unref(activeConnections);
             g_object_unref(nmProxy);
 
-            // Step 2: Retrieve existing connection settings
             return true;
         }
 
@@ -688,7 +677,6 @@ namespace WPEFramework
                 GVariant* managedVariant;
                 g_variant_get(result, "(v)", &managedVariant);
 
-                //gboolean managed = g_variant_get_boolean(managedVariant);
                 isEnabled = g_variant_get_boolean(managedVariant);
                 g_variant_unref(managedVariant);
 
@@ -702,86 +690,13 @@ namespace WPEFramework
 
         bool NetworkManagerClient::setIPSettings(const std::string& interface, const Exchange::INetworkManager::IPAddress& address)
         {
-            GError *error = nullptr;
-            GDBusProxy *nmProxy = NULL;
             std::string connectionPath;
-            nmProxy = m_dbus.getNetworkManagerProxy();
-            if(nmProxy == NULL)
-                return false;
-            GVariant *activeConnections = g_dbus_proxy_get_cached_property(nmProxy, "ActiveConnections");
-            if (activeConnections == nullptr) {
-                NMLOG_ERROR("Error retrieving active connections");
-                g_object_unref(nmProxy);
+            if (!GnomeUtils::getSettingsConnectionPath(m_dbus, connectionPath, interface))
+            {
+                NMLOG_ERROR("Error: connection path not found for interface %s", interface.c_str());
                 return false;
             }
-
-            GVariantIter iter;
-            g_variant_iter_init(&iter, activeConnections);
-            gchar *activeConnectionPath = nullptr;
-            bool found = false;
-            while (g_variant_iter_loop(&iter, "o", &activeConnectionPath)) {
-                GDBusProxy *activeConnectionProxy = m_dbus.getNetworkManagerActiveConnProxy(activeConnectionPath);
-
-                if (activeConnectionProxy == nullptr) {
-                    NMLOG_ERROR("Error creating active connection proxy: %s", error->message);
-                    g_error_free(error);
-                    continue;
-                }
-
-                GVariant *devicesVar = g_dbus_proxy_get_cached_property(activeConnectionProxy, "Devices");
-                if (devicesVar == nullptr) {
-                    NMLOG_ERROR("Error retrieving devices property");
-                    g_object_unref(activeConnectionProxy);
-                    continue;
-                }
-
-                GVariantIter devicesIter;
-                g_variant_iter_init(&devicesIter, devicesVar);
-                gchar *devicePath = nullptr;
-
-                while (g_variant_iter_loop(&devicesIter, "o", &devicePath)) {
-                    GDBusProxy *deviceProxy = m_dbus.getNetworkManagerDeviceProxy(devicePath);
-
-                    if (deviceProxy == nullptr) {
-                        NMLOG_ERROR("Error creating device proxy: %s", error->message);
-                        g_error_free(error);
-                        continue;
-                    }
-
-                    GVariant *ifaceProperty = g_dbus_proxy_get_cached_property(deviceProxy, "Interface");
-                    if (ifaceProperty) {
-                        const gchar *iface = g_variant_get_string(ifaceProperty, nullptr);
-                        if (interface == iface) {
-                            found = true;
-                            GVariant *connectionProperty = g_dbus_proxy_get_cached_property(activeConnectionProxy, "Connection");
-                            if (connectionProperty) {
-                                connectionPath = g_variant_get_string(connectionProperty, nullptr);
-                                g_variant_unref(connectionProperty);
-                            } else {
-                                NMLOG_ERROR("Error retrieving connection property");
-                            }
-
-                            g_variant_unref(ifaceProperty);
-                            g_object_unref(deviceProxy);
-                            break;
-                        }
-                        g_variant_unref(ifaceProperty);
-                    }
-
-                    g_object_unref(deviceProxy);
-                }
-                g_variant_unref(devicesVar);
-                g_object_unref(activeConnectionProxy);
-
-                if (found) {
-                    break;
-                }
-            }
-
-            g_variant_unref(activeConnections);
-            g_object_unref(nmProxy);
-
-            if (!found || connectionPath.empty()) {
+            if (connectionPath.empty()) {
                 NMLOG_ERROR("Error: Interface %s not found in active connections", interface.c_str());
                 return false;
             }
@@ -809,6 +724,10 @@ namespace WPEFramework
             gchar *ip6ConfigPath = NULL;
             GDBusProxy* ipv4Proxy = NULL;
             GDBusProxy* ipv6Proxy = NULL;
+            const gchar *IPv4Method = NULL;
+            const gchar *IPv6Method = NULL;
+            deviceInfo devInfo{};
+            GError *error = nullptr;
             if(!GnomeUtils::getDeviceByIpIface(m_dbus, interface.c_str(), devicePath))
                 return false;
             GDBusProxy *deviceProxy = m_dbus.getNetworkManagerDeviceProxy(devicePath.c_str());
@@ -1105,9 +1024,73 @@ namespace WPEFramework
                         g_object_unref(dhcpv6Proxy);
                     }
                 }
-           }
+            }
+            std::string connectionPath;
+            if (!GnomeUtils::getSettingsConnectionPath(m_dbus, connectionPath, interface))
+            {
+                NMLOG_ERROR("Error: connection path not found for interface %s", interface.c_str());
+                return false;
+            }
+
+            if(!GnomeUtils::getDeviceInfoByIfname(m_dbus, interface.c_str(), devInfo))
+                return false;
+            GDBusProxy *settingsProxy = m_dbus.getNetworkManagerSettingsConnectionProxy(connectionPath.c_str());
+
+            if (settingsProxy == nullptr) {
+                NMLOG_ERROR("Error creating connection settings proxy: %s",error->message);
+                g_error_free(error);
+                return false;
+            }
+
+            GVariant *connectionSettings = g_dbus_proxy_call_sync(
+                    settingsProxy,
+                    "GetSettings",
+                    nullptr,
+                    G_DBUS_CALL_FLAGS_NONE,
+                    -1,
+                    nullptr,
+                    &error);
+
+            if (connectionSettings == nullptr) {
+                NMLOG_ERROR("Error retrieving connection settings: %s", error->message);
+                g_error_free(error);
+                g_object_unref(settingsProxy);
+                return false;
+            }
+
+            GVariantIter *iterator;
+            GVariant *settingsDict;
+            const gchar *settingsKey;
+
+            g_variant_get(connectionSettings, "(a{sa{sv}})", &iterator);
+            while (g_variant_iter_loop(iterator, "{&s@a{sv}}", &settingsKey, &settingsDict)) {
+                GVariantIter settingsIter;
+                const gchar *key;
+                GVariant *value;
+
+                g_variant_iter_init(&settingsIter, settingsDict);
+                while (g_variant_iter_loop(&settingsIter, "{&sv}", &key, &value)) {
+                    if (g_strcmp0(key, "method") == 0) {
+                        if(g_strcmp0(settingsKey, "ipv4") == 0)
+                        {
+                            IPv4Method = g_variant_get_string(value, NULL);
+                            NMLOG_DEBUG("IPV4 Method: %s\n", IPv4Method);
+                        }
+                        else if(g_strcmp0(settingsKey, "ipv6") == 0)
+                        {
+                            IPv6Method = g_variant_get_string(value, NULL);
+                            NMLOG_DEBUG("IPV6 Method: %s\n", IPv6Method);
+                        }
+                    }
+                }
+            }
+
             result.ipversion = ipversion;
             result.autoconfig = true;
+            if(g_strcmp0(ipversion.c_str(), "IPv4") == 0)
+                result.autoconfig = (g_strcmp0(IPv4Method, "auto") == 0);
+            else if(g_strcmp0(ipversion.c_str(), "IPv6") == 0)
+                result.autoconfig = (g_strcmp0(IPv6Method, "auto") == 0);
             result.ipaddress = addressStr;
             result.prefix = prefix;
             result.ula = "";
