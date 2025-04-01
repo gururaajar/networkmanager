@@ -571,6 +571,18 @@ namespace WPEFramework
             }
             else
                 NMLOG_WARNING("ipversion error IPv4/IPv6");
+            NMLOG_INFO("=========================================================");
+            NMLOG_INFO("rc = %d", rc);
+            NMLOG_INFO("ipversion = %s", result.ipversion.c_str());
+            NMLOG_INFO("autoconfig = %d", result.autoconfig);
+            NMLOG_INFO("dhcpserver = %s", result.dhcpserver.c_str());
+            NMLOG_INFO("ula = %s", result.ula.c_str());
+            NMLOG_INFO("ipaddress = %s", result.ipaddress.c_str());
+            NMLOG_INFO("prefix = %d", result.prefix);
+            NMLOG_INFO("gateway = %s", result.gateway.c_str());
+            NMLOG_INFO("primarydns = %s", result.primarydns.c_str());
+            NMLOG_INFO("secondarydns = %s ", result.secondarydns.c_str());
+            NMLOG_INFO("=========================================================");
             return rc;
         }
 

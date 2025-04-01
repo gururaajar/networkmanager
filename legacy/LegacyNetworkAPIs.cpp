@@ -493,6 +493,7 @@ const string CIDR_PREFIXES[CIDR_NETMASK_IP_LEN+1] = {
             string interface{};
             string givenInterface{};
             string ipversion{};
+            Exchange::INetworkManager::IPAddress address{};
 
             if (parameters.HasLabel("interface"))
             {
@@ -511,7 +512,6 @@ const string CIDR_PREFIXES[CIDR_NETMASK_IP_LEN+1] = {
             auto _nwmgr = m_service->QueryInterfaceByCallsign<Exchange::INetworkManager>(NETWORK_MANAGER_CALLSIGN);
             if (_nwmgr)
             {
-                Exchange::INetworkManager::IPAddress address{};
                 rc = _nwmgr->GetIPSettings(interface, ipversion, address);
                 _nwmgr->Release();
 
@@ -544,6 +544,18 @@ const string CIDR_PREFIXES[CIDR_NETMASK_IP_LEN+1] = {
                     }
                 }
             }
+            NMLOG_INFO("=========================================================");
+            NMLOG_INFO("rc = %d", rc);
+            NMLOG_INFO("ipversion = %s", address.ipversion.c_str());
+            NMLOG_INFO("autoconfig = %d", address.autoconfig);
+            NMLOG_INFO("dhcpserver = %s", address.dhcpserver.c_str());
+            NMLOG_INFO("ula = %s", address.ula.c_str());
+            NMLOG_INFO("ipaddress = %s", address.ipaddress.c_str());
+            NMLOG_INFO("prefix = %d", address.prefix);
+            NMLOG_INFO("gateway = %s", address.gateway.c_str());
+            NMLOG_INFO("primarydns = %s", address.primarydns.c_str());
+            NMLOG_INFO("secondarydns = %s", address.secondarydns.c_str());
+            NMLOG_INFO("=========================================================");
             return rc;
         }
 
